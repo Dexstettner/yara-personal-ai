@@ -44,15 +44,6 @@ if errorlevel 1 (
 )
 echo [OK] Pacotes Python instalados
 
-echo.
-echo --- Copiando avatar ---
-if not exist assets mkdir assets
-if exist AI_Profile.png (
-    copy /Y AI_Profile.png assets\AI_Profile.png >nul
-    echo [OK] Avatar copiado para assets\
-) else (
-    echo [AVISO] AI_Profile.png nao encontrado. Coloque a imagem em assets\AI_Profile.png
-)
 
 echo.
 echo =============================================

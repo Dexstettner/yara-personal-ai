@@ -9,7 +9,13 @@ import io
 import os
 import threading
 import sys
+import warnings
+from contextlib import asynccontextmanager
 from pathlib import Path
+
+# pkg_resources é deprecated no setuptools >= 81; vem de dependências do Bark/TTS
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=DeprecationWarning)
+
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
@@ -48,20 +54,22 @@ stt = STTEngine(config["stt"], config["audio"])
 tts = TTSEngine(config["tts"])
 llm = LLMClient(config["ai"])
 
-# ─── App FastAPI ──────────────────────────────────────────────────────────
-app = FastAPI(title="AI Assistant Backend")
-
 # ─── Estado global ────────────────────────────────────────────────────────
 active_ws: WebSocket | None = None
 is_listening  = False
 is_speaking   = False
-pipeline_lock: asyncio.Lock | None = None   # criado no startup
+pipeline_lock: asyncio.Lock | None = None
 stop_speaking_evt = threading.Event()
 
-@app.on_event("startup")
-async def startup():
+# ─── Lifespan (substitui o deprecated @app.on_event) ─────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global pipeline_lock
     pipeline_lock = asyncio.Lock()
+    yield
+
+# ─── App FastAPI ──────────────────────────────────────────────────────────
+app = FastAPI(title="AI Assistant Backend", lifespan=lifespan)
 
 # ─── Helpers de envio ─────────────────────────────────────────────────────
 async def send(ws: WebSocket, msg: dict):
@@ -100,9 +108,18 @@ async def run_pipeline(ws: WebSocket, loop: asyncio.AbstractEventLoop):
 
         await send(ws, {"type": "transcript", "text": text})
 
-        # 3. LLM
+        # 3. LLM (com timeout para evitar travamento por VRAM insuficiente)
+        llm_timeout = config.get("ai", {}).get("timeout", 120)
         logger.info("[Pipeline] Consultando LLM...")
-        reply = await loop.run_in_executor(None, llm.chat, text)
+        try:
+            reply = await asyncio.wait_for(
+                loop.run_in_executor(None, llm.chat, text),
+                timeout=llm_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"[Pipeline] LLM não respondeu em {llm_timeout}s — VRAM insuficiente?")
+            await send(ws, {"type": "error", "message": "IA demorou demais. Tente um modelo menor ou reduza o contexto."})
+            return
         await send(ws, {"type": "reply_text", "text": reply})
 
         # 4. Lip-sync estimado a partir do texto

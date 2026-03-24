@@ -62,7 +62,8 @@ class LLMClient:
         try:
             import ollama
             base_url = self.cfg.get("base_url", "http://localhost:11434")
-            self.client = ollama.Client(host=base_url)
+            timeout   = self.cfg.get("timeout", 120)
+            self.client = ollama.Client(host=base_url, timeout=timeout)
             model = self.cfg.get("model", "llama3")
             # Verifica se o modelo está disponível localmente
             # list() pode retornar dict ou objeto dependendo da versão da lib
@@ -87,19 +88,35 @@ class LLMClient:
             self.client = None
 
     def _chat_ollama(self, user_text: str) -> str:
+        # Libera cache CUDA residual (Whisper) antes da inferência do LLM
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+
         model = self.cfg.get("model", "llama3")
         system_prompt = self.cfg.get("system_prompt", "Responda em português do Brasil.")
 
         # Ollama aceita 'system' como primeira mensagem
         messages = [{"role": "system", "content": system_prompt}] + self.history
 
+        options = {
+            "temperature": self.cfg.get("temperature", 0.8),
+            "num_predict": self.cfg.get("max_tokens", 1024),
+            "num_ctx":     self.cfg.get("num_ctx", 4096),
+        }
+        # num_gpu: null/ausente = Ollama auto-balanceia VRAM+RAM
+        # num_gpu: 99 = força tudo na GPU (só se o modelo couber na VRAM)
+        num_gpu = self.cfg.get("num_gpu")
+        if num_gpu is not None:
+            options["num_gpu"] = num_gpu
+
         response = self.client.chat(
             model=model,
             messages=messages,
-            options={
-                "temperature": self.cfg.get("temperature", 0.8),
-                "num_predict": self.cfg.get("max_tokens", 1024),
-            },
+            options=options,
         )
         # A lib ollama pode retornar dict ou objeto dependendo da versão
         if isinstance(response, dict):

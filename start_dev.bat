@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 echo =============================================
 echo   AI Assistant - Modo Desenvolvimento
 echo =============================================

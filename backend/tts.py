@@ -1,10 +1,11 @@
 """
-tts.py — Multi-engine TTS: edge-tts | voicevox | fish-speech
+tts.py — Multi-engine TTS: edge-tts | voicevox | fish-speech | bark
 Troque o provider em config.json → tts.provider
 
   edge-tts    : vozes neurais Microsoft (requer internet, sem API key)
   voicevox    : vozes anime japonesas (requer VOICEVOX rodando localmente)
   fish-speech : vozes naturais multilíngue (requer Fish Speech server local)
+  bark        : vozes expressivas offline com tokens de emoção (requer GPU)
 """
 
 import asyncio
@@ -53,6 +54,141 @@ async def _play_bytes(data: bytes, suffix: str, stop_event):
             except Exception:
                 pass
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pré-processamento de texto para Bark
+# Bark lê tudo literalmente — expressões como "Hmph!" viram "H m p h exclamação".
+# Este mapa converte sons e marcadores textuais nos tokens nativos do Bark.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# (padrão regex, substituição)
+_BARK_TOKEN_MAP = [
+    # risadas
+    (r'\b(haha+|hehe+|hihi+|kkk+|rs+|ahaha+)\b',          '[laughter]'),
+    # suspiros / hesitação
+    (r'\*suspira?\*|\*suspiro\*|\btch\b|\btsc\b',           '[sighs]'),
+    # "Hmph!" e variações — tom de desdém/implicância
+    (r'\b(hmph|hmpf|humph|mph)[!.]?\b',                    '[clears throat]'),
+    # gasps
+    (r'\*(gaspa?|espanta?)\*|\bgaspa?\b',                  '[gasps]'),
+    # ações entre asteriscos: *faz algo* → remove
+    (r'\*[^*\n]{1,60}\*',                                   ''),
+    # markdown bold/italic: **texto** ou _texto_ → só o texto
+    (r'\*\*([^*\n]+)\*\*',                                  r'\1'),
+    (r'_([^_\n]+)_',                                        r'\1'),
+]
+
+def _bark_preprocess(text: str) -> str:
+    """Converte expressões e marcadores textuais nos tokens de emoção do Bark."""
+    for pattern, replacement in _BARK_TOKEN_MAP:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    text = re.sub(r' {2,}', ' ', text).strip()
+    return text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Engine: bark
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _Bark:
+    """
+    Bark (offline, alta qualidade, suporta emoção)
+    Presets: v2/en_speaker_6 - masculino
+             v2/en_speaker_9 - feminino, mais agudo
+             v2/pt_speaker_0  # raro, PT ainda limitado
+    """
+
+    def __init__(self, cfg: dict):
+        self.voice       = cfg.get("voice",             "v2/en_speaker_9")
+        self.sample_rate = cfg.get("sample_rate",       24000)
+        self.device      = cfg.get("device",            "cuda")
+        self.use_small   = cfg.get("use_small_models",  True)
+        self.temperature = cfg.get("temperature",       0.7)
+        self.top_k       = cfg.get("top_k",             50)
+        self.top_p       = cfg.get("top_p",             0.95)
+        self.hf_token    = cfg.get("hf_token",          "")
+
+        if self.hf_token:
+            os.environ["HF_TOKEN"] = self.hf_token
+            os.environ["HUGGINGFACE_HUB_TOKEN"] = self.hf_token
+
+        logger.info(f"[TTS/bark] voice: {self.voice} | device: {self.device}")
+
+        # lazy load (evita travar startup)
+        self._model_loaded = False
+
+    def _ensure_model(self):
+        if not self._model_loaded:
+            import torch
+
+            # PyTorch 2.6+ mudou o default de torch.load para weights_only=True.
+            # Os checkpoints do Bark usam vários tipos numpy internos. Em vez de
+            # adivinhar cada tipo, fazemos patch temporário para weights_only=False
+            # (seguro, pois os pesos são do repositório oficial suno/bark).
+            _orig_load = torch.load
+            torch.load = lambda *a, **kw: _orig_load(*a, **{**kw, "weights_only": False})
+
+            use_gpu = self.device == "cuda" and torch.cuda.is_available()
+            if not use_gpu and self.device == "cuda":
+                logger.warning("[TTS/bark] CUDA solicitado mas não disponível — usando CPU.")
+
+            try:
+                from bark import preload_models
+                preload_models(
+                    text_use_gpu=use_gpu,
+                    coarse_use_gpu=use_gpu,
+                    fine_use_gpu=use_gpu,
+                    codec_use_gpu=use_gpu,
+                    text_use_small=self.use_small,
+                    coarse_use_small=self.use_small,
+                    fine_use_small=self.use_small,
+                )
+            finally:
+                torch.load = _orig_load  # restaura comportamento padrão
+
+            self._model_loaded = True
+
+    async def speak_async(self, text: str, stop_event):
+        import asyncio
+        import numpy as np
+        import soundfile as sf
+        import tempfile
+
+        text = _bark_preprocess(text)
+
+        try:
+            self._ensure_model()
+
+            from bark import generate_audio
+
+            # Bark é blocking → roda em thread
+            def _gen():
+                return generate_audio(
+                    text,
+                    history_prompt=self.voice,
+                    text_temp=self.temperature,
+                    waveform_temp=self.top_p,
+                )
+
+            audio_array = await asyncio.to_thread(_gen)
+
+            # salva temporário (igual EdgeTTS)
+            tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+            tmp.close()
+
+            sf.write(tmp.name, audio_array, self.sample_rate)
+
+            if not stop_event.is_set():
+                await _play_file(tmp.name, stop_event)
+
+        except Exception as e:
+            logger.error(f"[TTS/bark] Erro: {e}")
+        finally:
+            try:
+                if os.path.exists(tmp.name):
+                    os.remove(tmp.name)
+            except:
+                pass
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Engine: edge-tts
@@ -230,6 +366,7 @@ class _FishSpeech:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _ENGINES = {
+    "bark":        (_Bark,       "bark"),
     "edge-tts":    (_EdgeTTS,    "edge_tts"),
     "voicevox":    (_VoiceVox,   "voicevox"),
     "fish-speech": (_FishSpeech, "fish_speech"),

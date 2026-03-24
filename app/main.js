@@ -53,7 +53,7 @@ function createWindow() {
 function createTray() {
   // Usa ícone padrão se não houver ico
   const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
-  const fallback = path.join(__dirname, '..', 'assets', 'AI_Profile.png');
+  const fallback = path.join(__dirname, '..', 'assets', 'thinking.png');
   const trayIcon = fs.existsSync(iconPath) ? iconPath : fallback;
 
   tray = new Tray(trayIcon);

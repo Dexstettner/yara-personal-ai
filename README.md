@@ -249,7 +249,7 @@ yara-personal-ai/
 │   ├── wake_word.py     # Detector de wake word
 │   └── requirements.txt
 ├── assets/
-│   └── AI_Profile.png   # Imagem do avatar
+│   └── thinking.png   # Imagem do avatar
 ├── config.json          # Configuração central
 ├── start.bat            # Inicialização normal
 └── start_dev.bat        # Inicialização modo dev
