@@ -1,0 +1,6 @@
+# Dependências
+node_modules/
+
+# Logs
+*.log
+app.log

@@ -1,0 +1,271 @@
+/* ===== Reset & Base ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ===== Titlebar / Drag ===== */
+#titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  z-index: 100;
+  background: transparent;
+}
+
+#drag-region {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+#window-controls {
+  display: flex;
+  gap: 4px;
+  padding-right: 8px;
+  -webkit-app-region: no-drag;
+}
+
+#window-controls button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+#window-controls button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ===== App Container ===== */
+#app-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 28px;
+}
+
+/* ===== Avatar ===== */
+#avatar-wrapper {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+#fx-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#avatar-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+#avatar-img {
+  max-width: 90%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  z-index: 1;
+  /* Animação idle de respiração */
+  animation: idle-breathe 4s ease-in-out infinite;
+  transform-origin: bottom center;
+  filter: drop-shadow(0 0 0px rgba(180, 0, 80, 0));
+  transition: filter 0.5s ease;
+}
+
+#avatar-img.speaking {
+  animation: speaking-bounce 0.4s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 18px rgba(220, 40, 100, 0.8));
+}
+
+#avatar-img.listening {
+  animation: idle-breathe 4s ease-in-out infinite;
+  filter: drop-shadow(0 0 14px rgba(80, 140, 255, 0.8));
+}
+
+#mouth-canvas {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  /* Posicionado via JS sobre a boca */
+}
+
+/* ===== Animações ===== */
+@keyframes idle-breathe {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50%       { transform: scaleY(1.012) translateY(-3px); }
+}
+
+@keyframes speaking-bounce {
+  0%   { transform: scaleY(1) translateY(0); }
+  100% { transform: scaleY(1.018) translateY(-5px); }
+}
+
+/* ===== Status Indicator ===== */
+#status-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  border-radius: 20px;
+  padding: 4px 12px;
+  z-index: 10;
+}
+
+#status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4caf50;
+  transition: background 0.3s;
+}
+
+#status-dot.listening { background: #2196f3; animation: pulse-dot 1s infinite; }
+#status-dot.speaking  { background: #e91e63; animation: pulse-dot 0.5s infinite; }
+#status-dot.thinking  { background: #ff9800; animation: pulse-dot 1.2s infinite; }
+#status-dot.error     { background: #f44336; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(1.3); }
+}
+
+#status-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.5px;
+}
+
+/* ===== Chat Bubble ===== */
+#chat-bubble {
+  max-width: 88%;
+  background: rgba(20, 10, 30, 0.82);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(180, 40, 100, 0.4);
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin: 0 auto 8px;
+  color: #f0e0f0;
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 10;
+}
+
+#chat-bubble.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+}
+
+#bubble-text {
+  word-break: break-word;
+}
+
+/* ===== Controles ===== */
+#controls {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0 14px;
+  justify-content: center;
+  z-index: 10;
+}
+
+#controls button {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(180, 40, 100, 0.5);
+  background: rgba(20, 10, 30, 0.75);
+  backdrop-filter: blur(8px);
+  color: #e8a0c0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+#controls button:hover {
+  background: rgba(180, 40, 100, 0.35);
+  border-color: rgba(220, 60, 120, 0.8);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+#controls button:active {
+  transform: scale(0.96);
+}
+
+#btn-listen.active {
+  background: rgba(33, 150, 243, 0.4);
+  border-color: rgba(33, 150, 243, 0.9);
+  color: #90caf9;
+  animation: listen-pulse 1s ease-in-out infinite;
+}
+
+@keyframes listen-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.4); }
+  50%       { box-shadow: 0 0 0 10px rgba(33, 150, 243, 0); }
+}
+
+#controls button svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(180, 40, 100, 0.4); border-radius: 4px; }
+
+/* ===== Utilitários ===== */
+.hidden { display: none !important; }

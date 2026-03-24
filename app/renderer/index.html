@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Assistant</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Barra de controle (drag + botões) -->
+  <div id="titlebar">
+    <div id="drag-region"></div>
+    <div id="window-controls">
+      <button id="btn-minimize" title="Minimizar para bandeja">—</button>
+    </div>
+  </div>
+
+  <!-- Container principal -->
+  <div id="app-container">
+
+    <!-- Avatar -->
+    <div id="avatar-wrapper">
+      <canvas id="fx-canvas"></canvas>
+      <div id="avatar-frame">
+        <img id="avatar-img" src="../../assets/AI_Profile.png" alt="Avatar" draggable="false" />
+        <!-- Sobreposição da boca para lip-sync -->
+        <canvas id="mouth-canvas"></canvas>
+      </div>
+      <!-- Indicador de estado -->
+      <div id="status-indicator">
+        <div id="status-dot"></div>
+        <span id="status-text">Pronta</span>
+      </div>
+    </div>
+
+    <!-- Balão de chat -->
+    <div id="chat-bubble" class="hidden">
+      <div id="bubble-text"></div>
+    </div>
+
+    <!-- Controles inferiores -->
+    <div id="controls">
+      <button id="btn-listen" title="Falar (Ctrl+Space)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <button id="btn-stop" class="hidden" title="Parar">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="4" y="4" width="16" height="16" rx="2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script src="avatar.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>

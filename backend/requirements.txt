@@ -1,0 +1,33 @@
+# Backend AI Assistant - dependencias Python
+# Instale com: pip install -r requirements.txt
+#
+# CUDA 12.1+: certifique-se de ter CUDA Toolkit e cuDNN instalados.
+# Alternativa via pip (se nao tiver cuDNN no sistema):
+#   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+
+# ── Servidor WebSocket ────────────────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+websockets>=12.0
+
+# ── STT — Whisper local (GPU via CTranslate2) ─────────────────────────────────
+# CUDA 12.x requer ctranslate2 >= 4.0.0 (incluido como dependencia do faster-whisper)
+faster-whisper>=1.0.0
+
+# ── TTS ───────────────────────────────────────────────────────────────────────
+edge-tts>=6.1.9
+pygame>=2.5.0
+aiohttp>=3.9.0        # necessario para voicevox e fish-speech
+
+# ── Audio (microfone para STT) ────────────────────────────────────────────────
+# sounddevice requer PortAudio (no Windows ja vem embutido no pacote)
+sounddevice>=0.4.7
+numpy>=1.26.4,<2.0    # numpy 2.x pode quebrar compatibilidade com ctranslate2
+
+# ── LLM ──────────────────────────────────────────────────────────────────────
+anthropic>=0.40.0     # Claude (Anthropic API) — deixar vazio o api_key para usar Ollama
+ollama>=0.4.0         # Ollama (modelos locais: llama3, gemma3, mistral...)
+
+# ── Utilitarios ───────────────────────────────────────────────────────────────
+python-dotenv>=1.0.1
+pydantic>=2.7.0
