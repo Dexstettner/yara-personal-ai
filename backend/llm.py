@@ -135,8 +135,10 @@ class LLMClient:
             )
 
         self.history.append({"role": "user", "content": user_text})
-        if len(self.history) > 100:
-            self.history = self.history[-100:]
+        # Trunca por caracteres estimados (~3 chars/token) para respeitar num_ctx
+        max_chars = self.cfg.get("num_ctx", 2048) * 3
+        while len(self.history) > 1 and sum(len(m["content"]) for m in self.history) > max_chars:
+            self.history = self.history[2:]  # remove par user/assistant mais antigo
 
         try:
             provider = self.cfg.get("provider", "anthropic").lower()

@@ -1,15 +1,15 @@
 """
-tts.py — Multi-engine TTS: edge-tts | voicevox | fish-speech | index-tts2
+tts.py — Multi-engine TTS: chatterbox | edge-tts | voicevox | fish-speech | f5-tts
 Troque o provider em config.json → tts.provider
 
+  chatterbox  : clonagem de voz offline (Resemble AI, ~4-7 GB VRAM)
   edge-tts    : vozes neurais Microsoft (requer internet, sem API key)
   voicevox    : vozes anime japonesas (requer VOICEVOX rodando localmente)
   fish-speech : vozes naturais multilíngue (requer Fish Speech server local)
-  index-tts2  : TTS offline por clonagem de voz (requer reference_audio .wav)
+  f5-tts      : flow matching TTS, leve (~300 MB VRAM), clonagem de voz
 """
 
 import asyncio
-import ctypes
 import logging
 import math
 import os
@@ -20,23 +20,11 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def _to_short_path(path: str) -> str:
-    """Converte para caminho curto (8.3) no Windows — evita falhas de libs C++
-    com caminhos contendo caracteres especiais (ex: 'Área de Trabalho').
-    No-op em outros sistemas."""
-    if os.name != 'nt':
-        return path
-    buf = ctypes.create_unicode_buffer(1024)
-    if ctypes.windll.kernel32.GetShortPathNameW(path, buf, 1024):
-        return buf.value
-    return path  # fallback: retorna original se falhar
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers de reprodução via pygame
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def _play_file(path: str, stop_event, suffix: str = ""):
+async def _play_file(path: str, stop_event):
     """Reproduz arquivo de áudio (mp3/wav) via pygame e aguarda terminar."""
     import pygame
     try:
@@ -87,54 +75,103 @@ def _tts_preprocess(text: str) -> str:
     return text.strip()
 
 
+def _ref_to_wav(reference_audio: str) -> tuple[str | None, bool]:
+    """Resolve caminho do áudio de referência.
+    Retorna (path, is_temp) — is_temp indica se o arquivo deve ser deletado após uso."""
+    root = Path(__file__).parent.parent
+    ref  = Path(root / reference_audio)
+
+    if not ref.exists():
+        logger.warning(f"[TTS] Referência não encontrada: {ref} — sintetizando sem clonagem")
+        return None, False
+
+    if ref.suffix.lower() != ".wav":
+        import soundfile as sf
+        data, sr = sf.read(str(ref))
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp.close()
+        sf.write(tmp.name, data, sr)
+        return tmp.name, True
+
+    return str(ref), False
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# Engine: IndexTTS2
+# Parâmetros de emoção por engine
 # ─────────────────────────────────────────────────────────────────────────────
 
-class _IndexTTS2:
+_CHATTERBOX_EMOTION_PARAMS: dict[str, dict] = {
+    "default":   {"exaggeration": 0.50, "cfg_weight": 0.50},
+    "happy":     {"exaggeration": 0.80, "cfg_weight": 0.40},
+    "excited":   {"exaggeration": 1.00, "cfg_weight": 0.30},
+    "sad":       {"exaggeration": 0.30, "cfg_weight": 0.60},
+    "angry":     {"exaggeration": 1.20, "cfg_weight": 0.30},
+    "tsundere":  {"exaggeration": 0.90, "cfg_weight": 0.40},
+    "shy":       {"exaggeration": 0.35, "cfg_weight": 0.65},
+    "surprised": {"exaggeration": 1.00, "cfg_weight": 0.35},
+    "calm":      {"exaggeration": 0.30, "cfg_weight": 0.70},
+    "teasing":   {"exaggeration": 0.85, "cfg_weight": 0.40},
+}
+
+_F5TTS_EMOTION_SPEED: dict[str, float] = {
+    "default":   1.00,
+    "happy":     1.10,
+    "excited":   1.20,
+    "sad":       0.85,
+    "angry":     1.05,
+    "tsundere":  1.00,
+    "shy":       0.90,
+    "surprised": 1.10,
+    "calm":      0.90,
+    "teasing":   1.00,
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Engine: Chatterbox
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _ChatterboxTTS:
     """
-    IndexTTS2 — TTS offline de alta qualidade por clonagem de voz.
-    Modelo: IndexTeam/IndexTTS-2 (HuggingFace, ~650 MB).
-    Download automático no primeiro uso.
+    Chatterbox TTS — síntese de voz com clonagem (Resemble AI).
+    Modelos baixados automaticamente do HuggingFace (~5 GB no primeiro uso).
 
-    SOBRE PT-BR:
-      O modelo clona o timbre do reference_audio fornecido.
-      Coloque um .wav/.mp3 de 5 a 30 s de um falante PT-BR em:
-        assets/reference_voice.mp3
+    Variantes (config.json → tts.chatterbox.variant):
+      turbo        : ~4.5 GB VRAM, mais rápido, clonagem de voz
+      standard     : ~6-7 GB VRAM, melhor qualidade, clonagem de voz
+      multilingual : ~6-7 GB VRAM, 23+ idiomas (usa language_id: "pt")
 
-    INSTALAÇÃO (IndexTTS v2 — obrigatório para o modelo IndexTeam/IndexTTS-2):
-      pip uninstall indextts -y
-      pip install git+https://github.com/index-tts/index-tts.git
-      pip install wetext   # normalização numérica no Windows
+    Parâmetros:
+      exaggeration : expressividade emocional (0.25–2.0, padrão 0.5)
+      cfg_weight   : aderência à voz de referência/ritmo (0.0–1.0, padrão 0.5)
+      language_id  : só para variante multilingual (ex: "pt", "en", "ja")
 
-    Configuração em config.json → tts.index_tts2:
-      reference_audio : caminho relativo à raiz do projeto
-      model_dir       : onde salvar os checkpoints (padrão: models/index-tts2)
-      device          : "cuda" ou "cpu"
-      use_fp16        : true para GPU (menor VRAM, mais rápido)
+    Instalação (dentro do conda yara):
+      pip install chatterbox-tts --no-deps
+      pip install resemble-perth conformer diffusers einops
+      pip install "transformers<4.50.0"   # necessário após remover indextts
     """
 
-    HF_REPO_V2 = "IndexTeam/IndexTTS-2"
-    HF_REPO_V1 = "IndexTeam/IndexTTS"
+    _VARIANT_IMPORTS = {
+        "turbo":        ("chatterbox.tts_turbo", "ChatterboxTurboTTS"),
+        "standard":     ("chatterbox.tts",       "ChatterboxTTS"),
+        "multilingual": ("chatterbox.mtl_tts",   "ChatterboxMultilingualTTS"),
+    }
 
     def __init__(self, cfg: dict):
-        self.model_dir         = cfg.get("model_dir",         "models/index-tts2")
-        self.reference_audio   = cfg.get("reference_audio",   "assets/reference_voice.wav")
-        self.device            = cfg.get("device",            "cuda")
-        self.use_fp16          = cfg.get("use_fp16",          True)
-        self.use_cuda_kernel   = cfg.get("use_cuda_kernel",   False)
-        self.use_accel         = cfg.get("use_accel",         False)
-        self.use_torch_compile = cfg.get("use_torch_compile", False)
-        self._model            = None
-        self._api_v2           = False
-        self._load_error       = None
+        self.device          = cfg.get("device",          "cuda")
+        self.reference_audio = cfg.get("reference_audio", "assets/reference_voice.wav")
+        self.variant         = cfg.get("variant",         "turbo")
+        self.exaggeration    = cfg.get("exaggeration",    0.5)
+        self.cfg_weight      = cfg.get("cfg_weight",      0.5)
+        self.language_id     = cfg.get("language_id",     "pt")
+        self._model          = None
+        self._load_error     = None
 
         logger.info(
-            f"[TTS/index-tts2] device: {self.device} | fp16: {self.use_fp16} | "
-            f"cuda_kernel: {self.use_cuda_kernel} | torch_compile: {self.use_torch_compile}"
+            f"[TTS/chatterbox] variant: {self.variant} | device: {self.device} | "
+            f"exaggeration: {self.exaggeration} | cfg_weight: {self.cfg_weight}"
         )
-
-    # ── carregamento lazy ────────────────────────────────────────────────────
 
     def _ensure_model(self):
         if self._model is not None:
@@ -145,138 +182,69 @@ class _IndexTTS2:
                 "  Corrija o problema e reinicie o backend."
             )
 
-        # Detecta versão da biblioteca instalada
-        try:
-            from indextts.infer_v2 import IndexTTS2 as IndexTTSClass
-            self._api_v2 = True
-            hf_repo = self.HF_REPO_V2
-            logger.info("[TTS/index-tts2] Biblioteca v2 detectada (infer_v2.IndexTTS2)")
-        except ImportError:
-            try:
-                from indextts.infer import IndexTTS as IndexTTSClass
-                self._api_v2 = False
-                hf_repo = self.HF_REPO_V1
-                logger.warning(
-                    "[TTS/index-tts2] infer_v2 não encontrado — usando IndexTTS v1.\n"
-                    "  Para usar IndexTTS-2, reinstale:\n"
-                    "    pip uninstall indextts -y\n"
-                    "    pip install git+https://github.com/index-tts/index-tts.git"
-                )
-            except ImportError:
-                raise RuntimeError(
-                    "[TTS/index-tts2] indextts não instalado.\n"
-                    "  Execute: pip install git+https://github.com/index-tts/index-tts.git"
-                )
-
         import torch
         if self.device == "cuda" and not torch.cuda.is_available():
-            logger.warning("[TTS/index-tts2] CUDA não disponível — usando CPU. "
-                           "Instale torch com suporte CUDA ou mude device para 'cpu' no config.json.")
+            logger.warning("[TTS/chatterbox] CUDA não disponível — usando CPU.")
             self.device = "cpu"
 
-        root = Path(__file__).parent.parent
-        mdir = root / self.model_dir
-        mdir.mkdir(parents=True, exist_ok=True)
+        if self.variant not in self._VARIANT_IMPORTS:
+            logger.warning(f"[TTS/chatterbox] Variante '{self.variant}' inválida — usando turbo.")
+            self.variant = "turbo"
 
-        if not (mdir / "gpt.pth").exists():
-            logger.info(f"[TTS/index-tts2] Baixando {hf_repo} (~650 MB)...")
-            from huggingface_hub import snapshot_download
-            snapshot_download(repo_id=hf_repo, local_dir=str(mdir))
-            logger.info("[TTS/index-tts2] Download concluído.")
-
-        cfg_path = str(mdir / "config.yaml")
-        is_fp16  = self.use_fp16 and self.device == "cuda"
-
-        # Parâmetros diferem entre v1 e v2 — passa apenas o que o construtor aceita
-        import inspect
-        sig    = inspect.signature(IndexTTSClass.__init__)
-        params = sig.parameters
-
-        is_cuda = self.device == "cuda"
-        kwargs = {"model_dir": _to_short_path(str(mdir)), "cfg_path": _to_short_path(cfg_path)}
-        # mapeia todos os nomes conhecidos de fp16 entre versões do indextts
-        for fp16_key in ("use_fp16", "is_fp16", "is_half", "fp16"):
-            if fp16_key in params:
-                kwargs[fp16_key] = is_fp16
-        if "device"           in params: kwargs["device"]           = self.device
-        if "use_cuda_kernel"  in params: kwargs["use_cuda_kernel"]  = self.use_cuda_kernel and is_cuda
-        if "use_torch_compile"in params: kwargs["use_torch_compile"]= self.use_torch_compile
-        if "use_accel"     in params: kwargs["use_accel"]     = self.use_accel
-        if "use_deepspeed" in params: kwargs["use_deepspeed"] = False
-
+        module_path, cls_name = self._VARIANT_IMPORTS[self.variant]
         try:
-            self._model = IndexTTSClass(**kwargs)
+            import importlib
+            cls = getattr(importlib.import_module(module_path), cls_name)
+            self._model = cls.from_pretrained(device=self.device)
         except Exception as e:
             self._load_error = str(e)
             raise
-        logger.info(f"[TTS/index-tts2] Modelo carregado (params: {list(kwargs.keys())})")
+        logger.info(f"[TTS/chatterbox] Modelo '{self.variant}' carregado em {self.device}")
 
-    # ── inferência ───────────────────────────────────────────────────────────
-
-    async def speak_async(self, text: str, stop_event):
+    async def speak_async(self, text: str, stop_event, emotion: str = "default"):
         text = _tts_preprocess(text)
         if not text.strip():
             return
 
-        root     = Path(__file__).parent.parent
-        ref_path = Path(root / self.reference_audio)
-
-        # Converte automaticamente mp3 → wav se necessário
-        if ref_path.exists() and ref_path.suffix.lower() != ".wav":
-            import soundfile as sf
-            data, sr = sf.read(str(ref_path))
-            wav_tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-            wav_tmp.close()
-            sf.write(wav_tmp.name, data, sr)
-            ref_path = Path(wav_tmp.name)
-            logger.info(f"[TTS/index-tts2] Referência convertida: {wav_tmp.name}")
-
-        if not ref_path.exists():
-            logger.error(
-                f"[TTS/index-tts2] Áudio de referência não encontrado: {ref_path}\n"
-                "  → Coloque um .mp3 ou .wav PT-BR (5-30s) em assets/reference_voice.mp3"
-            )
-            return
-
-        ref_str = _to_short_path(str(ref_path))
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        tmp.close()
+        ep = _CHATTERBOX_EMOTION_PARAMS.get(emotion, _CHATTERBOX_EMOTION_PARAMS["default"])
+        ref_path, ref_is_tmp = _ref_to_wav(self.reference_audio)
+        tmp_out = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp_out.close()
 
         try:
             await asyncio.to_thread(self._ensure_model)
-
             if stop_event.is_set():
                 return
 
             def _gen():
-                if self._api_v2:
-                    # IndexTTS-2: parâmetro renomeado para spk_audio_prompt
-                    self._model.infer(
-                        spk_audio_prompt=ref_str,
-                        text=text,
-                        output_path=tmp.name,
-                    )
-                else:
-                    # IndexTTS v1
-                    self._model.infer(
-                        audio_prompt=ref_str,
-                        text=text,
-                        output_path=tmp.name,
-                    )
+                import torchaudio
+                kwargs = {
+                    "text":         text,
+                    "exaggeration": ep["exaggeration"],
+                    "cfg_weight":   ep["cfg_weight"],
+                }
+                if ref_path:
+                    kwargs["audio_prompt_path"] = ref_path
+                if self.variant == "multilingual":
+                    kwargs["language_id"] = self.language_id
+
+                wav = self._model.generate(**kwargs)
+                torchaudio.save(tmp_out.name, wav, self._model.sr)
 
             await asyncio.to_thread(_gen)
 
             if not stop_event.is_set():
-                await _play_file(tmp.name, stop_event)
+                await _play_file(tmp_out.name, stop_event)
 
         except Exception as e:
-            logger.error(f"[TTS/index-tts2] Erro: {e}")
+            logger.error(f"[TTS/chatterbox] Erro: {e}")
         finally:
-            if os.path.exists(tmp.name):
-                try:
-                    os.remove(tmp.name)
-                except Exception:
-                    pass
+            for path, should_delete in [(tmp_out.name, True), (ref_path, ref_is_tmp)]:
+                if should_delete and path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -298,7 +266,7 @@ class _EdgeTTS:
         self.volume = cfg.get("volume_pct", "+0%")
         logger.info(f"[TTS/edge-tts] voz: {self.voice}")
 
-    async def speak_async(self, text: str, stop_event):
+    async def speak_async(self, text: str, stop_event, emotion: str = "default"):
         import edge_tts
 
         text = _tts_preprocess(text)
@@ -351,7 +319,7 @@ class _VoiceVox:
         self.volume     = cfg.get("volume",     1.0)
         logger.info(f"[TTS/voicevox] host: {self.host} | speaker: {self.speaker_id}")
 
-    async def speak_async(self, text: str, stop_event):
+    async def speak_async(self, text: str, stop_event, emotion: str = "default"):
         async with self._lock:
             try:
                 import aiohttp
@@ -416,7 +384,7 @@ class _FishSpeech:
         self.format       = "wav"
         logger.info(f"[TTS/fish-speech] host: {self.host}")
 
-    async def speak_async(self, text: str, stop_event):
+    async def speak_async(self, text: str, stop_event, emotion: str = "default"):
         try:
             import aiohttp
         except ImportError:
@@ -450,14 +418,179 @@ class _FishSpeech:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Engine: F5-TTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _F5TTS:
+    """
+    F5-TTS — flow matching TTS com clonagem de voz (~300 MB VRAM).
+
+    Instalação (dentro do conda yara):
+      pip install f5-tts
+
+    Parâmetros em config.json → tts.f5_tts:
+      device         : "cuda" ou "cpu"
+      reference_audio: caminho para .wav de referência
+      ref_text       : transcrição do áudio de referência (vazio = auto-detecta)
+      model          : "F5TTS_v1_Base" (padrão)
+      speed          : fator de velocidade base (padrão 1.0)
+    """
+
+    def __init__(self, cfg: dict):
+        self.device          = cfg.get("device",          "cuda")
+        self.reference_audio = cfg.get("reference_audio", "assets/reference_voice.wav")
+        self.ref_text        = cfg.get("ref_text",        "")
+        self.model_name      = cfg.get("model",           "F5TTS_v1_Base")
+        self.speed           = cfg.get("speed",           1.0)
+        self._model          = None
+        self._load_error     = None
+
+        logger.info(f"[TTS/f5-tts] model: {self.model_name} | device: {self.device}")
+
+    def _ensure_model(self):
+        if self._model is not None:
+            return
+        if self._load_error is not None:
+            raise RuntimeError(
+                f"Carregamento anterior falhou: {self._load_error}\n"
+                "  Corrija o problema e reinicie o backend."
+            )
+
+        import torch
+        if self.device == "cuda" and not torch.cuda.is_available():
+            logger.warning("[TTS/f5-tts] CUDA não disponível — usando CPU.")
+            self.device = "cpu"
+
+        try:
+            from f5_tts.api import F5TTS
+            self._model = F5TTS(model=self.model_name, device=self.device)
+        except Exception as e:
+            self._load_error = str(e)
+            raise
+        logger.info(f"[TTS/f5-tts] Modelo '{self.model_name}' carregado em {self.device}")
+
+    def _get_ref(self) -> tuple[str | None, bool]:
+        ref_path, ref_is_tmp = _ref_to_wav(self.reference_audio)
+        if not ref_path:
+            logger.error(
+                "[TTS/f5-tts] reference_audio não encontrado — F5-TTS exige ref_file. "
+                "Configure tts.f5_tts.reference_audio com um .wav válido."
+            )
+        return ref_path, ref_is_tmp
+
+    def _infer_one(self, text: str, emotion: str, ref_path: str):
+        """Sintetiza um trecho e retorna (wav_array, sample_rate).
+        Deve ser chamado dentro de asyncio.to_thread."""
+        speed = _F5TTS_EMOTION_SPEED.get(emotion, 1.0) * self.speed
+        kwargs: dict = {
+            "ref_file":       ref_path,
+            "gen_text":       text,
+            "speed":          speed,
+            "remove_silence": True,
+        }
+        if self.ref_text:
+            kwargs["ref_text"] = self.ref_text
+        wav, sr, _ = self._model.infer(**kwargs)
+        return wav, sr
+
+    async def speak_async(self, text: str, stop_event, emotion: str = "default"):
+        text = _tts_preprocess(text)
+        if not text.strip():
+            return
+
+        ref_path, ref_is_tmp = self._get_ref()
+        if not ref_path:
+            return
+
+        tmp_path = None
+        try:
+            await asyncio.to_thread(self._ensure_model)
+            if stop_event.is_set():
+                return
+
+            def _gen():
+                import soundfile as sf
+                wav, sr = self._infer_one(text, emotion, ref_path)
+                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                tmp.close()
+                sf.write(tmp.name, wav, sr)
+                return tmp.name
+
+            tmp_path = await asyncio.to_thread(_gen)
+
+            if not stop_event.is_set():
+                await _play_file(tmp_path, stop_event)
+
+        except Exception as e:
+            logger.error(f"[TTS/f5-tts] Erro: {e}")
+        finally:
+            for path, should_delete in [(tmp_path, True), (ref_path, ref_is_tmp)]:
+                if should_delete and path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
+
+    async def speak_segments_async(
+        self, segments: list[tuple[str, str]], stop_event
+    ):
+        """Sintetiza todos os segmentos, concatena e reproduz de uma vez."""
+        ref_path, ref_is_tmp = self._get_ref()
+        if not ref_path:
+            return
+
+        tmp_path = None
+        try:
+            await asyncio.to_thread(self._ensure_model)
+            if stop_event.is_set():
+                return
+
+            def _gen_all():
+                import numpy as np
+                import soundfile as sf
+                all_wavs = []
+                sr_out = None
+                for emotion, text in segments:
+                    text = _tts_preprocess(text)
+                    if not text.strip():
+                        continue
+                    wav, sr = self._infer_one(text, emotion, ref_path)
+                    all_wavs.append(wav)
+                    sr_out = sr
+                if not all_wavs:
+                    return None
+                combined = np.concatenate(all_wavs) if len(all_wavs) > 1 else all_wavs[0]
+                tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+                tmp.close()
+                sf.write(tmp.name, combined, sr_out)
+                return tmp.name
+
+            tmp_path = await asyncio.to_thread(_gen_all)
+
+            if tmp_path and not stop_event.is_set():
+                await _play_file(tmp_path, stop_event)
+
+        except Exception as e:
+            logger.error(f"[TTS/f5-tts] Erro nos segmentos: {e}")
+        finally:
+            for path, should_delete in [(tmp_path, True), (ref_path, ref_is_tmp)]:
+                if should_delete and path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # TTSEngine — fachada pública
 # ─────────────────────────────────────────────────────────────────────────────
 
 _ENGINES = {
-    "index-tts2":  (_IndexTTS2,  "index_tts2"),
-    "edge-tts":    (_EdgeTTS,    "edge_tts"),
-    "voicevox":    (_VoiceVox,   "voicevox"),
-    "fish-speech": (_FishSpeech, "fish_speech"),
+    "chatterbox":  (_ChatterboxTTS, "chatterbox"),
+    "edge-tts":    (_EdgeTTS,       "edge_tts"),
+    "voicevox":    (_VoiceVox,      "voicevox"),
+    "fish-speech": (_FishSpeech,    "fish_speech"),
+    "f5-tts":      (_F5TTS,        "f5_tts"),
 }
 
 
@@ -486,8 +619,23 @@ class TTSEngine:
         except Exception as e:
             logger.error(f"[TTS] Erro ao inicializar pygame: {e}")
 
-    async def speak_async(self, text: str, stop_event) -> None:
-        await self._engine.speak_async(text, stop_event)
+    async def speak_async(self, text: str, stop_event, emotion: str = "default") -> None:
+        await self._engine.speak_async(text, stop_event, emotion=emotion)
+
+    async def speak_segments_async(
+        self, segments: list[tuple[str, str]], stop_event
+    ) -> None:
+        """Sintetiza e reproduz segmentos.
+        Engines que implementam speak_segments_async próprio (ex: F5-TTS)
+        sintetizam em batch e concatenam antes de reproduzir.
+        Os demais reproduzem segmento a segmento."""
+        if hasattr(self._engine, "speak_segments_async"):
+            await self._engine.speak_segments_async(segments, stop_event)
+        else:
+            for emotion, text in segments:
+                if stop_event.is_set():
+                    break
+                await self._engine.speak_async(text, stop_event, emotion=emotion)
 
     def stop(self):
         try:

@@ -41,9 +41,10 @@ class STTEngine:
         channels    = self.cfg_audio.get("channels", 1)
         chunk_size  = self.cfg_audio.get("chunk_size", 1024)
         device      = self.cfg_audio.get("input_device_index")
-        silence_ms  = self.cfg_stt.get("silence_threshold_ms", 700)
-        silence_smp = int(sr * silence_ms / 1000)
-        vad_filter  = self.cfg_stt.get("vad_filter", True)
+        silence_ms    = self.cfg_stt.get("silence_threshold_ms", 700)
+        silence_smp   = int(sr * silence_ms / 1000)
+        silence_rms   = self.cfg_stt.get("silence_rms_threshold", 0.015)
+        vad_filter    = self.cfg_stt.get("vad_filter", True)
 
         frames        = []
         silent_count  = 0
@@ -74,7 +75,7 @@ class STTEngine:
                 frames.append(mono)
 
                 rms = float(np.sqrt(np.mean(mono ** 2)))
-                is_silent = rms < 0.015
+                is_silent = rms < silence_rms
 
                 if not is_silent:
                     has_speech   = True

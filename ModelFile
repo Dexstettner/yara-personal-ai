@@ -1,6 +1,5 @@
-FROM llama3.1:8b-instruct-q4_K_M
+FROM qwen2.5:3b
 
-PARAMETER num_gpu 1
-PARAMETER num_ctx 1024
-PARAMETER num_predict 80
+PARAMETER num_ctx 2048
+PARAMETER num_predict 280
 PARAMETER num_batch 512

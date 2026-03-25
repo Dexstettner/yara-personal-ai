@@ -7,6 +7,7 @@ import json
 import logging
 import io
 import os
+import re
 import threading
 import sys
 import warnings
@@ -99,9 +100,63 @@ async def send(ws: WebSocket, msg: dict):
     except Exception as e:
         logger.warning(f"[WS] Erro ao enviar mensagem: {e}")
 
+# ─── Emotion parser ──────────────────────────────────────────────────────────
+
+_VALID_EMOTIONS = {
+    "happy", "excited", "sad", "angry", "tsundere",
+    "shy", "surprised", "calm", "teasing",
+}
+_SEGMENT_RE = re.compile(r'\[(\w+)\]\s*', re.IGNORECASE)
+
+
+def _parse_segments(text: str) -> list[tuple[str, str]]:
+    """Divide texto em segmentos (emoção, trecho) pelas tags de emoção.
+    Ex: '[tsundere] Tch! [angry] Me irritou...' →
+        [('tsundere', 'Tch!'), ('angry', 'Me irritou...')]
+    Texto antes da primeira tag recebe emoção 'default'.
+    """
+    parts = _SEGMENT_RE.split(text)
+    # split com grupo capturador: [antes, tag1, trecho1, tag2, trecho2, ...]
+    segments: list[tuple[str, str]] = []
+
+    if parts[0].strip():
+        segments.append(("default", parts[0].strip()))
+
+    i = 1
+    while i + 1 < len(parts):
+        tag = parts[i].lower()
+        seg_text = parts[i + 1].strip()
+        emotion = tag if tag in _VALID_EMOTIONS else "default"
+        if seg_text:
+            segments.append((emotion, seg_text))
+        i += 2
+
+    return segments or [("default", text.strip())]
+
+
+def _display_text(segments: list[tuple[str, str]]) -> str:
+    """Junta todos os trechos sem as tags para exibição no chat bubble."""
+    return " ".join(t for _, t in segments)
+
+
+async def _speak_reply(ws: WebSocket, segments: list[tuple[str, str]]) -> None:
+    """Reproduz os segmentos de resposta, garantindo reset de is_speaking via try/finally."""
+    global is_speaking
+    display = _display_text(segments)
+    lip_sync = tts.estimate_lip_sync(display)
+    is_speaking = True
+    stop_speaking_evt.clear()
+    await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
+    try:
+        await tts.speak_segments_async(segments, stop_speaking_evt)
+    finally:
+        is_speaking = False
+        await send(ws, {"type": "speaking_stop"})
+
+
 # ─── Pipeline principal ───────────────────────────────────────────────────
 async def run_pipeline(ws: WebSocket, loop: asyncio.AbstractEventLoop):
-    global is_listening, is_speaking
+    global is_listening
 
     # Lock garante que apenas um pipeline roda por vez
     if pipeline_lock.locked():
@@ -113,11 +168,11 @@ async def run_pipeline(ws: WebSocket, loop: asyncio.AbstractEventLoop):
         is_listening = True
         await send(ws, {"type": "listening_start"})
         logger.info("[Pipeline] Gravando...")
-
-        audio = await loop.run_in_executor(None, stt.record_until_silence)
-
-        is_listening = False
-        await send(ws, {"type": "listening_stop"})
+        try:
+            audio = await loop.run_in_executor(None, stt.record_until_silence)
+        finally:
+            is_listening = False
+            await send(ws, {"type": "listening_stop"})
 
         # 2. Transcrição
         logger.info("[Pipeline] Transcrevendo...")
@@ -141,29 +196,18 @@ async def run_pipeline(ws: WebSocket, loop: asyncio.AbstractEventLoop):
             logger.error(f"[Pipeline] LLM não respondeu em {llm_timeout}s — VRAM insuficiente?")
             await send(ws, {"type": "error", "message": "IA demorou demais. Tente um modelo menor ou reduza o contexto."})
             return
-        await send(ws, {"type": "reply_text", "text": reply})
+        segments = _parse_segments(reply)
+        display = _display_text(segments)
+        await send(ws, {"type": "reply_text", "text": display})
 
-        # 4. Lip-sync estimado a partir do texto
-        lip_sync = tts.estimate_lip_sync(reply)
-
-        # 5. Reproduzir voz (edge-tts é async — sem run_in_executor, sem deadlock)
-        logger.info("[Pipeline] Falando...")
-        is_speaking = True
-        stop_speaking_evt.clear()
-        await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
-
-        await tts.speak_async(reply, stop_speaking_evt)
-
-        is_speaking = False
-        await send(ws, {"type": "speaking_stop"})
+        logger.info("[Pipeline] Falando... %s", [(e, t) for e, t in segments])
+        await _speak_reply(ws, segments)
         logger.info("[Pipeline] Concluído.")
 
 
 # ─── Debug: texto → LLM → TTS ─────────────────────────────────────────────
 async def run_debug_think(ws: WebSocket, loop: asyncio.AbstractEventLoop, text: str):
     """Pula STT: envia `text` direto para o LLM e fala a resposta."""
-    global is_speaking
-
     if pipeline_lock.locked():
         logger.warning("[Debug/think] Pipeline em execução, ignorando.")
         return
@@ -183,41 +227,27 @@ async def run_debug_think(ws: WebSocket, loop: asyncio.AbstractEventLoop, text: 
             await send(ws, {"type": "error", "message": "IA demorou demais."})
             return
 
-        await send(ws, {"type": "reply_text", "text": reply})
+        segments = _parse_segments(reply)
+        display = _display_text(segments)
+        await send(ws, {"type": "reply_text", "text": display})
 
-        lip_sync = tts.estimate_lip_sync(reply)
-        is_speaking = True
-        stop_speaking_evt.clear()
-        await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
-
-        await tts.speak_async(reply, stop_speaking_evt)
-
-        is_speaking = False
-        await send(ws, {"type": "speaking_stop"})
+        await _speak_reply(ws, segments)
         logger.info("[Debug/think] Concluído.")
 
 
 # ─── Debug: texto → TTS direto ────────────────────────────────────────────
 async def run_debug_speak(ws: WebSocket, text: str):
     """Pula STT e LLM: fala `text` diretamente via TTS."""
-    global is_speaking
-
     if pipeline_lock.locked():
         logger.warning("[Debug/speak] Pipeline em execução, ignorando.")
         return
 
     async with pipeline_lock:
-        logger.info(f"[Debug/speak] Texto: {text!r}")
+        segments = _parse_segments(text)
+        display = _display_text(segments)
+        logger.info("[Debug/speak] %s", [(e, t) for e, t in segments])
 
-        lip_sync = tts.estimate_lip_sync(text)
-        is_speaking = True
-        stop_speaking_evt.clear()
-        await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
-
-        await tts.speak_async(text, stop_speaking_evt)
-
-        is_speaking = False
-        await send(ws, {"type": "speaking_stop"})
+        await _speak_reply(ws, segments)
         logger.info("[Debug/speak] Concluído.")
 
 # ─── WebSocket endpoint ───────────────────────────────────────────────────
@@ -226,7 +256,7 @@ async def websocket_endpoint(ws: WebSocket):
     global active_ws
     await ws.accept()
     active_ws = ws
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     logger.info("[WS] Cliente conectado")
 
     try:
@@ -279,7 +309,7 @@ async def websocket_endpoint(ws: WebSocket):
 # ─── Health check ─────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
-    return {"status": "ok", "stt": stt.model is not None, "tts": tts.tts is not None}
+    return {"status": "ok", "stt": stt.model is not None, "tts": tts._engine is not None}
 
 # ─── Ponto de entrada ─────────────────────────────────────────────────────
 if __name__ == "__main__":
