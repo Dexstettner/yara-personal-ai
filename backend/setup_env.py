@@ -52,6 +52,7 @@ _STT_REQ: dict[str, str] = {
 _LLM_REQ: dict[str, str] = {
     "anthropic": "llm_anthropic.txt",
     "ollama":    "llm_ollama.txt",
+    "llama-cpp": "llm_llama_cpp.txt",
 }
 
 # Providers que precisam de passos manuais (nao instaláveis so via pip)

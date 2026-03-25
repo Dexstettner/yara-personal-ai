@@ -3,19 +3,22 @@ llm — Large Language Model package.
 Troque o provider em config.json -> ai.provider
 
   anthropic : Claude via API Anthropic
-  ollama    : modelos locais via Ollama
+  ollama    : modelos locais via Ollama (daemon externo)
+  llama-cpp : modelos GGUF in-process via llama-cpp-python (sem daemon, menor latencia)
 """
 
 import logging
 
 from .anthropic import AnthropicProvider
 from .ollama import OllamaProvider
+from .llama_cpp import LlamaCppProvider
 
 logger = logging.getLogger(__name__)
 
 _PROVIDERS: dict[str, type] = {
     "anthropic": AnthropicProvider,
     "ollama":    OllamaProvider,
+    "llama-cpp": LlamaCppProvider,
 }
 
 

@@ -1,0 +1,24 @@
+# ── LLM: llama-cpp-python (in-process, sem daemon) ───────────────────────────
+#
+# OPCAO A — Wheels pre-compilados (recomendado, sem VS Build Tools)
+#   Verifique sua versao CUDA em: nvidia-smi (canto superior direito)
+#
+#   CUDA 12.4:  pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+#   CUDA 12.3:  pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu123
+#   CUDA 12.2:  pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu122
+#   CUDA 12.1:  pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+#   CPU only:   pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+#
+# OPCAO B — Compilar do zero (requer VS Build Tools com C++ workload)
+#   Download: https://aka.ms/vs/17/release/vs_BuildTools.exe
+#   Selecionar: "Desenvolvimento para Desktop com C++"
+#   Depois:
+#     set CMAKE_ARGS=-DGGML_CUDA=on
+#     set FORCE_CMAKE=1
+#     pip install llama-cpp-python --no-cache-dir --force-reinstall
+#
+# O modelo .gguf deve ser colocado em models/ (ex: models/fast-llama.gguf)
+# Configure o caminho em config.json -> ai.llama_cpp.model_path
+#
+# llama-cpp-python nao e listado aqui pois a instalacao varia por CUDA version.
+# Use um dos comandos acima diretamente.

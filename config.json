@@ -9,7 +9,15 @@
     "temperature": 0.8,
     "num_gpu": 99,
     "num_ctx": 2048,
-    "timeout": 120
+    "timeout": 120,
+    "llama_cpp": {
+      "model_path": "models/fast-llama.gguf",
+      "n_gpu_layers": -1,
+      "n_threads": null,
+      "n_ctx": 2048,
+      "temperature": 0.8,
+      "max_tokens": 300
+    }
   },
   "stt": {
     "provider": "faster-whisper",
@@ -92,8 +100,8 @@
     "window_width": 400,
     "window_height": 700,
     "always_on_top": true,
-    "position_x": 2113,
-    "position_y": 571,
+    "position_x": 1994,
+    "position_y": 520,
     "opacity": 1,
     "show_chat_bubble": true,
     "idle_animation": true,
