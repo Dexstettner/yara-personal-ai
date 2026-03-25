@@ -1,0 +1,6 @@
+# ── TTS: Fish Speech (vozes multilíngue, servidor local) ─────────────────────
+# Sem dependências pip adicionais — comunica via HTTP com o Fish Speech server.
+# aiohttp já está em base.txt
+#
+# Inicie o servidor Fish Speech:
+#   https://github.com/fishaudio/fish-speech

@@ -1,0 +1,19 @@
+# ── TTS: Chatterbox (clonagem de voz, ~4-7 GB VRAM) ─────────────────────────
+#
+# ATENÇÃO — instalação especial:
+#   1. conda install -c conda-forge pynini   ← DEVE ser instalado via conda
+#   2. pip install chatterbox-tts --no-deps  ← NÃO via requirements (--no-deps)
+#   3. pip install -r tts_chatterbox.txt     ← dependências restantes
+#
+# CONFLITO CONHECIDO: chatterbox requer transformers < 4.50.0
+# Não instale chatterbox e f5-tts na mesma env.
+# Use setup_env.py para criar envs isoladas.
+#
+resemble-perth
+conformer
+diffusers
+einops
+transformers<4.50.0
+torchaudio>=2.0.0
+soundfile>=0.12.0
+huggingface_hub>=0.22.0

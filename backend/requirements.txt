@@ -1,45 +1,27 @@
 # Backend AI Assistant - dependencias Python
-# Instale com: pip install -r requirements.txt
+#
+# ══════════════════════════════════════════════════════════════════════════════
+# RECOMENDADO: instale apenas as deps dos providers que você vai usar.
+#
+#   python setup_env.py           ← lê config.json e instala só o necessário
+#   python setup_env.py --check   ← mostra o que seria instalado
+#   python setup_env.py --tts f5-tts --llm ollama --stt whisper
+#
+# Os arquivos por provider estão em: requirements/
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Este arquivo instala TUDO (todos os providers).
+# Use apenas para referenciar o conjunto completo ou CI/CD.
 #
 # CUDA 12.1+: certifique-se de ter CUDA Toolkit e cuDNN instalados.
 # Alternativa via pip (se nao tiver cuDNN no sistema):
 #   pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
 
-# ── Servidor WebSocket ────────────────────────────────────────────────────────
-fastapi>=0.111.0
-uvicorn[standard]>=0.29.0
-websockets>=12.0
-
-# ── STT — Whisper local (GPU via CTranslate2) ─────────────────────────────────
-# CUDA 12.x requer ctranslate2 >= 4.0.0 (incluido como dependencia do faster-whisper)
-faster-whisper>=1.0.0
-
-# ── TTS — IndexTTS2 ───────────────────────────────────────────────────────────
-# IMPORTANTE: no Windows, instale pynini via conda ANTES do pip:
-#   conda install -c conda-forge pynini
-# Depois instale o indextts do repositório oficial:
-#   pip install git+https://github.com/index-tts/index-tts.git
-#
-# O modelo (~650 MB) é baixado automaticamente do HuggingFace no primeiro uso.
-# Coloque um .wav PT-BR (5-30s) em assets/reference_voice.wav para clonar a voz.
-torchaudio>=2.0.0
-soundfile>=0.12.0
-huggingface_hub>=0.22.0
-
-# ── TTS — outros providers ────────────────────────────────────────────────────
-edge-tts>=6.1.9
-pygame>=2.5.0
-aiohttp>=3.9.0        # necessario para voicevox e fish-speech
-
-# ── Audio (microfone para STT) ────────────────────────────────────────────────
-# sounddevice requer PortAudio (no Windows ja vem embutido no pacote)
-sounddevice>=0.4.7
-numpy>=1.26.4,<2.0    # numpy 2.x pode quebrar compatibilidade com ctranslate2
-
-# ── LLM ──────────────────────────────────────────────────────────────────────
-anthropic>=0.40.0     # Claude (Anthropic API) — deixar vazio o api_key para usar Ollama
-ollama>=0.4.0         # Ollama (modelos locais: llama3, gemma3, mistral...)
-
-# ── Utilitarios ───────────────────────────────────────────────────────────────
-python-dotenv>=1.0.1
-pydantic>=2.7.0
+-r requirements/base.txt
+-r requirements/stt_whisper.txt
+-r requirements/llm_anthropic.txt
+-r requirements/llm_ollama.txt
+-r requirements/tts_edge.txt
+-r requirements/tts_f5.txt
+# tts_chatterbox requer passos manuais — veja requirements/tts_chatterbox.txt
+# -r requirements/tts_chatterbox.txt

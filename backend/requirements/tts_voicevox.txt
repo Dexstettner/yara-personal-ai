@@ -1,0 +1,6 @@
+# ── TTS: VOICEVOX (vozes anime japonesas, servidor local) ────────────────────
+# Sem dependências pip adicionais — comunica via HTTP com o servidor VOICEVOX.
+# aiohttp já está em base.txt
+#
+# Instale o VOICEVOX Engine separadamente:
+#   https://voicevox.hiroshiba.jp/

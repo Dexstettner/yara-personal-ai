@@ -1,0 +1,2 @@
+# ── TTS: edge-tts (vozes Microsoft, requer internet, sem API key) ─────────────
+edge-tts>=6.1.9

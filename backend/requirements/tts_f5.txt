@@ -1,0 +1,8 @@
+# ── TTS: F5-TTS (flow matching, ~300 MB VRAM, clonagem de voz) ───────────────
+# CONFLITO CONHECIDO: f5-tts pode requerer transformers >= 4.40
+# Se usar chatterbox na mesma env, pode ocorrer conflito de versão do transformers.
+# Para isolar completamente, crie um conda env separado (ver setup_env.py --help).
+f5-tts
+torchaudio>=2.0.0
+soundfile>=0.12.0
+huggingface_hub>=0.22.0

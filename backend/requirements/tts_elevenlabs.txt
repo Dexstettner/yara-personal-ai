@@ -1,0 +1,6 @@
+# ── TTS: ElevenLabs (vozes premium, requer internet + API key) ───────────────
+# Sem dependências pip adicionais — comunica via HTTP com a API ElevenLabs.
+# aiohttp já está em base.txt
+#
+# Configure a API key:
+#   ELEVENLABS_API_KEY=sk-... no arquivo .env

@@ -1,0 +1,8 @@
+# ── STT: silero-vad (ONNX) + faster-whisper ───────────────────────────────────
+# silero-vad >= 5.0 usa onnxruntime por padrao — nao requer torch.
+# Se torch ja estiver instalado (f5-tts, chatterbox), sera usado automaticamente.
+#
+# Para GPU: substitua onnxruntime por onnxruntime-gpu
+silero-vad>=5.0
+onnxruntime>=1.16.0
+faster-whisper>=1.0.0

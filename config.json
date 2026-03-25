@@ -12,14 +12,29 @@
     "timeout": 120
   },
   "stt": {
-    "provider": "whisper",
-    "model": "large-v3",
-    "language": "pt",
-    "device": "cpu",
-    "compute_type": "int8",
-    "vad_filter": true,
-    "silence_threshold_ms": 400,
-    "silence_rms_threshold": 0.015
+    "provider": "faster-whisper",
+    "faster_whisper": {
+      "model": "large-v3-turbo",
+      "device": "cpu",
+      "compute_type": "int8",
+      "beam_size": 1,
+      "language": "pt",
+      "vad_filter": true,
+      "condition_on_previous_text": false,
+      "silence_threshold_ms": 400,
+      "silence_rms_threshold": 0.015,
+      "max_record_ms": 30000
+    },
+    "silero": {
+      "model": "large-v3-turbo",
+      "device": "cpu",
+      "compute_type": "int8",
+      "beam_size": 1,
+      "language": "pt",
+      "vad_threshold": 0.5,
+      "min_silence_ms": 500,
+      "max_record_ms": 30000
+    }
   },
   "tts": {
     "provider": "f5-tts",
@@ -54,6 +69,15 @@
       "ref_text": "Olá, você consegue me ouvir bem? Que ótimo! Eu estava esperando por isso.",
       "model": "F5TTS_v1_Base",
       "speed": 0.4
+    },
+    "elevenlabs": {
+      "api_key": "",
+      "voice_id": "Sm1seazb4gs7RSlUVw7c",
+      "model_id": "eleven_flash_v2_5",
+      "output_format": "mp3_44100_128",
+      "stability": 0.5,
+      "similarity_boost": 0.75,
+      "style": 0
     }
   },
   "audio": {
@@ -68,8 +92,8 @@
     "window_width": 400,
     "window_height": 700,
     "always_on_top": true,
-    "position_x": 2038,
-    "position_y": 292,
+    "position_x": 2113,
+    "position_y": 571,
     "opacity": 1,
     "show_chat_bubble": true,
     "idle_animation": true,
