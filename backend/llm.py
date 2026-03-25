@@ -32,11 +32,13 @@ class LLMClient:
 
     # ─── Anthropic / Claude ───────────────────────────────────────────────
     def _init_anthropic(self):
-        api_key = self.cfg.get("api_key", "").strip()
+        # Prioridade: .env (ANTHROPIC_API_KEY) → config.json (ai.api_key)
+        import os
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip() or self.cfg.get("api_key", "").strip()
         if not api_key:
             logger.warning(
                 "[LLM] api_key não configurada. "
-                "Adicione sua chave Anthropic em config.json → ai.api_key"
+                "Adicione ANTHROPIC_API_KEY no .env ou ai.api_key no config.json"
             )
             return
         try:

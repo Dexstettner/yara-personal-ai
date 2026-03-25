@@ -106,11 +106,12 @@ class _Bark:
         self.temperature = cfg.get("temperature",       0.7)
         self.top_k       = cfg.get("top_k",             50)
         self.top_p       = cfg.get("top_p",             0.95)
-        self.hf_token    = cfg.get("hf_token",          "")
-
-        if self.hf_token:
-            os.environ["HF_TOKEN"] = self.hf_token
-            os.environ["HUGGINGFACE_HUB_TOKEN"] = self.hf_token
+        # HF_TOKEN vem do .env (carregado pelo main.py via dotenv)
+        # Fallback: config.json → bark.hf_token (legado)
+        hf_token = os.environ.get("HF_TOKEN") or cfg.get("hf_token", "")
+        if hf_token:
+            os.environ["HF_TOKEN"] = hf_token
+            os.environ["HUGGINGFACE_HUB_TOKEN"] = hf_token
 
         logger.info(f"[TTS/bark] voice: {self.voice} | device: {self.device}")
 

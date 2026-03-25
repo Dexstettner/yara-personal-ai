@@ -12,6 +12,10 @@ import sys
 import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Carrega .env da raiz do projeto (tokens, chaves de API)
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 # pkg_resources é deprecated no setuptools >= 81; vem de dependências do Bark/TTS
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=DeprecationWarning)
