@@ -12,13 +12,26 @@ import sys
 import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# ─── OpenMP duplicado (PyTorch + CTranslate2 carregam libiomp5md.dll duas vezes)
+# Deve ser setado ANTES de qualquer import que carregue OpenMP
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
+# ─── Filtros de warning ANTES de qualquer import não-stdlib ──────────────────
+# NumPy conda-forge MINGW
+warnings.filterwarnings("ignore", message="Numpy built with MINGW-W64")
+warnings.filterwarnings("ignore", "invalid value encountered in exp2")
+warnings.filterwarnings("ignore", "invalid value encountered in log10")
+warnings.filterwarnings("ignore", "invalid value encountered in nextafter")
+# pkg_resources deprecated — pygame emite UserWarning, outros DeprecationWarning
+warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
+# hf_xet não instalado — fallback para HTTP é funcional, warning é desnecessário
+warnings.filterwarnings("ignore", message="Xet Storage is enabled")
+
 from dotenv import load_dotenv
 
 # Carrega .env da raiz do projeto (tokens, chaves de API)
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
-
-# pkg_resources é deprecated no setuptools >= 81; vem de dependências do Bark/TTS
-warnings.filterwarnings("ignore", message="pkg_resources is deprecated", category=DeprecationWarning)
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect

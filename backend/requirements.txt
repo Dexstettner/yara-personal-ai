@@ -14,7 +14,19 @@ websockets>=12.0
 # CUDA 12.x requer ctranslate2 >= 4.0.0 (incluido como dependencia do faster-whisper)
 faster-whisper>=1.0.0
 
-# ── TTS ───────────────────────────────────────────────────────────────────────
+# ── TTS — IndexTTS2 ───────────────────────────────────────────────────────────
+# IMPORTANTE: no Windows, instale pynini via conda ANTES do pip:
+#   conda install -c conda-forge pynini
+# Depois instale o indextts do repositório oficial:
+#   pip install git+https://github.com/index-tts/index-tts.git
+#
+# O modelo (~650 MB) é baixado automaticamente do HuggingFace no primeiro uso.
+# Coloque um .wav PT-BR (5-30s) em assets/reference_voice.wav para clonar a voz.
+torchaudio>=2.0.0
+soundfile>=0.12.0
+huggingface_hub>=0.22.0
+
+# ── TTS — outros providers ────────────────────────────────────────────────────
 edge-tts>=6.1.9
 pygame>=2.5.0
 aiohttp>=3.9.0        # necessario para voicevox e fish-speech
