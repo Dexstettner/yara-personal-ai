@@ -98,6 +98,11 @@ html, body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+#avatar-frame.flipped {
+  transform: scaleX(-1);
 }
 
 #avatar-img {
@@ -260,6 +265,85 @@ html, body {
 #controls button svg {
   width: 22px;
   height: 22px;
+}
+
+/* ===== Painel de Debug ===== */
+#debug-panel {
+  position: fixed;
+  bottom: 76px;
+  left: 6%;
+  right: 6%;
+  background: rgba(15, 8, 28, 0.92);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(100, 50, 160, 0.45);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 20;
+}
+
+.debug-label {
+  font-size: 10px;
+  color: rgba(180, 130, 220, 0.7);
+  letter-spacing: 0.4px;
+  margin-top: 2px;
+}
+
+.debug-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.debug-row input {
+  flex: 1;
+  background: rgba(40, 15, 65, 0.7);
+  border: 1px solid rgba(120, 50, 180, 0.4);
+  border-radius: 8px;
+  padding: 5px 9px;
+  color: #e0d0f0;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+  transition: border-color 0.2s;
+}
+
+.debug-row input::placeholder {
+  color: rgba(180, 140, 210, 0.4);
+}
+
+.debug-row input:focus {
+  border-color: rgba(160, 80, 220, 0.75);
+}
+
+.debug-row button {
+  width: 32px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 50, 180, 0.5);
+  background: rgba(60, 15, 100, 0.65);
+  color: #c090e8;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.debug-row button:hover {
+  background: rgba(100, 30, 160, 0.75);
+  border-color: rgba(160, 80, 220, 0.8);
+  color: #fff;
+}
+
+.debug-row button:active {
+  transform: scale(0.94);
 }
 
 /* ===== Scrollbar ===== */

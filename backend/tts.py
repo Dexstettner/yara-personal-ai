@@ -9,6 +9,7 @@ Troque o provider em config.json → tts.provider
 """
 
 import asyncio
+import ctypes
 import logging
 import math
 import os
@@ -17,6 +18,18 @@ import tempfile
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _to_short_path(path: str) -> str:
+    """Converte para caminho curto (8.3) no Windows — evita falhas de libs C++
+    com caminhos contendo caracteres especiais (ex: 'Área de Trabalho').
+    No-op em outros sistemas."""
+    if os.name != 'nt':
+        return path
+    buf = ctypes.create_unicode_buffer(1024)
+    if ctypes.windll.kernel32.GetShortPathNameW(path, buf, 1024):
+        return buf.value
+    return path  # fallback: retorna original se falhar
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,16 +118,20 @@ class _IndexTTS2:
     HF_REPO_V1 = "IndexTeam/IndexTTS"
 
     def __init__(self, cfg: dict):
-        self.model_dir       = cfg.get("model_dir",       "models/index-tts2")
-        self.reference_audio = cfg.get("reference_audio", "assets/reference_voice.wav")
-        self.device          = cfg.get("device",          "cuda")
-        self.use_fp16        = cfg.get("use_fp16",        True)
-        self._model          = None
-        self._api_v2         = False  # definido em _ensure_model
+        self.model_dir         = cfg.get("model_dir",         "models/index-tts2")
+        self.reference_audio   = cfg.get("reference_audio",   "assets/reference_voice.wav")
+        self.device            = cfg.get("device",            "cuda")
+        self.use_fp16          = cfg.get("use_fp16",          True)
+        self.use_cuda_kernel   = cfg.get("use_cuda_kernel",   False)
+        self.use_accel         = cfg.get("use_accel",         False)
+        self.use_torch_compile = cfg.get("use_torch_compile", False)
+        self._model            = None
+        self._api_v2           = False
+        self._load_error       = None
 
         logger.info(
-            f"[TTS/index-tts2] reference: {self.reference_audio} | "
-            f"device: {self.device} | fp16: {self.use_fp16}"
+            f"[TTS/index-tts2] device: {self.device} | fp16: {self.use_fp16} | "
+            f"cuda_kernel: {self.use_cuda_kernel} | torch_compile: {self.use_torch_compile}"
         )
 
     # ── carregamento lazy ────────────────────────────────────────────────────
@@ -122,6 +139,11 @@ class _IndexTTS2:
     def _ensure_model(self):
         if self._model is not None:
             return
+        if self._load_error is not None:
+            raise RuntimeError(
+                f"Carregamento anterior falhou: {self._load_error}\n"
+                "  Corrija o problema e reinicie o backend."
+            )
 
         # Detecta versão da biblioteca instalada
         try:
@@ -147,6 +169,11 @@ class _IndexTTS2:
                 )
 
         import torch
+        if self.device == "cuda" and not torch.cuda.is_available():
+            logger.warning("[TTS/index-tts2] CUDA não disponível — usando CPU. "
+                           "Instale torch com suporte CUDA ou mude device para 'cpu' no config.json.")
+            self.device = "cpu"
+
         root = Path(__file__).parent.parent
         mdir = root / self.model_dir
         mdir.mkdir(parents=True, exist_ok=True)
@@ -158,20 +185,30 @@ class _IndexTTS2:
             logger.info("[TTS/index-tts2] Download concluído.")
 
         cfg_path = str(mdir / "config.yaml")
-        is_fp16  = self.use_fp16 and self.device == "cuda" and torch.cuda.is_available()
+        is_fp16  = self.use_fp16 and self.device == "cuda"
 
         # Parâmetros diferem entre v1 e v2 — passa apenas o que o construtor aceita
         import inspect
         sig    = inspect.signature(IndexTTSClass.__init__)
         params = sig.parameters
 
-        kwargs = {"model_dir": str(mdir), "cfg_path": cfg_path}
-        if "is_fp16"  in params: kwargs["is_fp16"]  = is_fp16
-        if "is_half"  in params: kwargs["is_half"]  = is_fp16
-        if "fp16"     in params: kwargs["fp16"]      = is_fp16
-        if "device"   in params: kwargs["device"]    = self.device
+        is_cuda = self.device == "cuda"
+        kwargs = {"model_dir": _to_short_path(str(mdir)), "cfg_path": _to_short_path(cfg_path)}
+        # mapeia todos os nomes conhecidos de fp16 entre versões do indextts
+        for fp16_key in ("use_fp16", "is_fp16", "is_half", "fp16"):
+            if fp16_key in params:
+                kwargs[fp16_key] = is_fp16
+        if "device"           in params: kwargs["device"]           = self.device
+        if "use_cuda_kernel"  in params: kwargs["use_cuda_kernel"]  = self.use_cuda_kernel and is_cuda
+        if "use_torch_compile"in params: kwargs["use_torch_compile"]= self.use_torch_compile
+        if "use_accel"     in params: kwargs["use_accel"]     = self.use_accel
+        if "use_deepspeed" in params: kwargs["use_deepspeed"] = False
 
-        self._model = IndexTTSClass(**kwargs)
+        try:
+            self._model = IndexTTSClass(**kwargs)
+        except Exception as e:
+            self._load_error = str(e)
+            raise
         logger.info(f"[TTS/index-tts2] Modelo carregado (params: {list(kwargs.keys())})")
 
     # ── inferência ───────────────────────────────────────────────────────────
@@ -201,7 +238,7 @@ class _IndexTTS2:
             )
             return
 
-        ref_str = str(ref_path)
+        ref_str = _to_short_path(str(ref_path))
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         tmp.close()
 

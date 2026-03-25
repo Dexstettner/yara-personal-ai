@@ -11,6 +11,7 @@
   <div id="titlebar">
     <div id="drag-region"></div>
     <div id="window-controls">
+      <button id="btn-debug-toggle" title="Painel de debug">⚙</button>
       <button id="btn-minimize" title="Minimizar para bandeja">—</button>
     </div>
   </div>
@@ -53,6 +54,20 @@
           <rect x="4" y="4" width="16" height="16" rx="2"/>
         </svg>
       </button>
+    </div>
+
+    <!-- Painel de debug (oculto por padrão) -->
+    <div id="debug-panel" class="hidden">
+      <div class="debug-label">Pensar (LLM → voz)</div>
+      <div class="debug-row">
+        <input type="text" id="debug-think-input" placeholder="Texto para a Yara pensar..." />
+        <button id="btn-debug-think" title="Enviar para LLM e falar">▶</button>
+      </div>
+      <div class="debug-label">Falar direto (só voz)</div>
+      <div class="debug-row">
+        <input type="text" id="debug-speak-input" placeholder="Texto para falar diretamente..." />
+        <button id="btn-debug-speak" title="Falar diretamente via TTS">♪</button>
+      </div>
     </div>
   </div>
 

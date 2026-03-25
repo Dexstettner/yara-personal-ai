@@ -1,6 +1,8 @@
 # Dependências
 node_modules/
+models/
 **/__pycache__/
+.claude/
 
 # Logs
 *.log

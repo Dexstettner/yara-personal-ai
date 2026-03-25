@@ -29,6 +29,7 @@ async function init() {
   connectWS();
   setupControls();
   setupHotkeys();
+  initAvatarFlip();
 }
 
 // ─── WebSocket ───────────────────────────────────────────────────────────────
@@ -120,6 +121,40 @@ function setupControls() {
   btnListen.addEventListener('click', toggleListen);
   btnStop.addEventListener('click', () => sendWS('stop_speaking'));
   btnMinimize.addEventListener('click', () => window.electronAPI?.minimizeToTray());
+  setupDebugPanel();
+}
+
+function setupDebugPanel() {
+  const btnToggle   = document.getElementById('btn-debug-toggle');
+  const panel       = document.getElementById('debug-panel');
+  const thinkInput  = document.getElementById('debug-think-input');
+  const speakInput  = document.getElementById('debug-speak-input');
+  const btnThink    = document.getElementById('btn-debug-think');
+  const btnSpeak    = document.getElementById('btn-debug-speak');
+
+  btnToggle.addEventListener('click', () => {
+    panel.classList.toggle('hidden');
+  });
+
+  function sendDebugThink() {
+    const text = thinkInput.value.trim();
+    if (!text) return;
+    sendWS('debug_think', { text });
+    thinkInput.value = '';
+  }
+
+  function sendDebugSpeak() {
+    const text = speakInput.value.trim();
+    if (!text) return;
+    sendWS('debug_speak', { text });
+    speakInput.value = '';
+  }
+
+  btnThink.addEventListener('click', sendDebugThink);
+  btnSpeak.addEventListener('click', sendDebugSpeak);
+
+  thinkInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendDebugThink(); });
+  speakInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendDebugSpeak(); });
 }
 
 function setupHotkeys() {
@@ -172,29 +207,64 @@ function scheduleBubbleHide(ms) {
   }, ms);
 }
 
+// ─── Orientação do avatar (vira para o centro da tela) ───────────────────
+function updateAvatarFlip(windowX) {
+  const screenMidX = window.screen.width / 2;
+  const windowMidX = windowX + window.innerWidth / 2;
+  document.getElementById('avatar-frame')
+    .classList.toggle('flipped', windowMidX > screenMidX);
+}
+
+async function initAvatarFlip() {
+  if (!window.electronAPI) return;
+  const pos = await window.electronAPI.getPosition();
+  updateAvatarFlip(pos[0]);
+}
+
 // ─── Drag da janela pelo avatar ──────────────────────────────────────────
 (function setupDrag() {
   const frame = document.getElementById('avatar-frame');
   let dragging = false;
-  let startX, startY, winStartX, winStartY;
+  let startScreenX, startScreenY, winStartX, winStartY;
+  let pendingX = null, pendingY = null, rafPending = false;
 
-  frame.addEventListener('mousedown', (e) => {
+  frame.addEventListener('mousedown', async (e) => {
     if (e.button !== 0) return;
     dragging = true;
-    startX = e.screenX;
-    startY = e.screenY;
-    // Posição atual não disponível diretamente; backend Electron salva
+    startScreenX = e.screenX;
+    startScreenY = e.screenY;
+    if (window.electronAPI) {
+      const pos = await window.electronAPI.getPosition();
+      winStartX = pos[0];
+      winStartY = pos[1];
+    }
   });
 
   document.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    const dx = e.screenX - startX;
-    const dy = e.screenY - startY;
-    // Electron não expõe moveTo diretamente no renderer sem IPC extra
-    // Usamos CSS transform como fallback visual (limitado)
+    if (!dragging || !window.electronAPI || winStartX === undefined) return;
+    pendingX = winStartX + (e.screenX - startScreenX);
+    pendingY = winStartY + (e.screenY - startScreenY);
+    if (!rafPending) {
+      rafPending = true;
+      requestAnimationFrame(() => {
+        window.electronAPI.moveWindow(pendingX, pendingY);
+        updateAvatarFlip(pendingX);
+        rafPending = false;
+      });
+    }
   });
 
-  document.addEventListener('mouseup', () => { dragging = false; });
+  document.addEventListener('mouseup', (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (window.electronAPI && winStartX !== undefined) {
+      const finalX = winStartX + (e.screenX - startScreenX);
+      const finalY = winStartY + (e.screenY - startScreenY);
+      window.electronAPI.savePosition(finalX, finalY);
+      updateAvatarFlip(finalX);
+    }
+    winStartX = undefined;
+  });
 })();
 
 // ─── Boot ────────────────────────────────────────────────────────────────

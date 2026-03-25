@@ -15,36 +15,34 @@
     "provider": "whisper",
     "model": "large-v3",
     "language": "pt",
-    "device": "cuda",
-    "compute_type": "int8_float16",
+    "device": "cpu",
+    "compute_type": "int8",
     "vad_filter": true,
     "silence_threshold_ms": 400
   },
   "tts": {
     "provider": "index-tts2",
-
     "index_tts2": {
       "model_dir": "models/index-tts2",
-      "reference_audio": "assets/reference_voice.mp3",
+      "reference_audio": "assets/reference_voice.wav",
       "device": "cuda",
-      "use_fp16": true
+      "use_fp16": true,
+      "use_cuda_kernel": false,
+      "use_torch_compile": false
     },
-
     "edge_tts": {
       "voice": "pt-BR-ThalitaNeural",
       "rate_pct": "+0%",
       "volume_pct": "+0%"
     },
-
     "voicevox": {
       "host": "http://localhost:50021",
       "speaker_id": 2,
-      "speed": 1.0,
-      "pitch": 0.0,
-      "intonation": 1.0,
-      "volume": 1.0
+      "speed": 1,
+      "pitch": 0,
+      "intonation": 1,
+      "volume": 1
     },
-
     "fish_speech": {
       "host": "http://localhost:50021",
       "reference_id": null
@@ -62,9 +60,9 @@
     "window_width": 400,
     "window_height": 700,
     "always_on_top": true,
-    "position_x": null,
-    "position_y": null,
-    "opacity": 1.0,
+    "position_x": 1980,
+    "position_y": 544,
+    "opacity": 1,
     "show_chat_bubble": true,
     "idle_animation": true,
     "mouth_y_offset": 0.38,
@@ -72,7 +70,10 @@
   },
   "app": {
     "language": "pt-br",
-    "supported_languages": ["pt-br", "en-us"],
+    "supported_languages": [
+      "pt-br",
+      "en-us"
+    ],
     "hotkey_listen": "ctrl+space",
     "hotkey_toggle": "ctrl+shift+h",
     "backend_port": 8765,

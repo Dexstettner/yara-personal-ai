@@ -140,6 +140,16 @@ ipcMain.on('save-position', (event, { x, y }) => {
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 });
 
+// IPC: obter posição atual da janela
+ipcMain.handle('get-position', () => {
+  return mainWindow ? mainWindow.getPosition() : [0, 0];
+});
+
+// IPC: mover janela (drag pelo avatar)
+ipcMain.on('move-window', (event, { x, y }) => {
+  if (mainWindow) mainWindow.setPosition(Math.round(x), Math.round(y));
+});
+
 // IPC: recarregar config
 ipcMain.handle('get-config', () => {
   config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));

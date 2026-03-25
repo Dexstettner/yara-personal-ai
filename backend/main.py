@@ -27,6 +27,10 @@ warnings.filterwarnings("ignore", "invalid value encountered in nextafter")
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
 # hf_xet não instalado — fallback para HTTP é funcional, warning é desnecessário
 warnings.filterwarnings("ignore", message="Xet Storage is enabled")
+# past_key_values legado no indextts — não quebra até transformers 4.53
+warnings.filterwarnings("ignore", message="Passing a tuple of `past_key_values`")
+# GenerationMixin — aviso interno do indextts, não afeta funcionamento atual
+warnings.filterwarnings("ignore", message=".*GenerationMixin.*")
 
 from dotenv import load_dotenv
 
@@ -154,6 +158,68 @@ async def run_pipeline(ws: WebSocket, loop: asyncio.AbstractEventLoop):
         await send(ws, {"type": "speaking_stop"})
         logger.info("[Pipeline] Concluído.")
 
+
+# ─── Debug: texto → LLM → TTS ─────────────────────────────────────────────
+async def run_debug_think(ws: WebSocket, loop: asyncio.AbstractEventLoop, text: str):
+    """Pula STT: envia `text` direto para o LLM e fala a resposta."""
+    global is_speaking
+
+    if pipeline_lock.locked():
+        logger.warning("[Debug/think] Pipeline em execução, ignorando.")
+        return
+
+    async with pipeline_lock:
+        logger.info(f"[Debug/think] Texto: {text!r}")
+        await send(ws, {"type": "transcript", "text": text})
+
+        llm_timeout = config.get("ai", {}).get("timeout", 120)
+        try:
+            reply = await asyncio.wait_for(
+                loop.run_in_executor(None, llm.chat, text),
+                timeout=llm_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"[Debug/think] LLM timeout ({llm_timeout}s)")
+            await send(ws, {"type": "error", "message": "IA demorou demais."})
+            return
+
+        await send(ws, {"type": "reply_text", "text": reply})
+
+        lip_sync = tts.estimate_lip_sync(reply)
+        is_speaking = True
+        stop_speaking_evt.clear()
+        await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
+
+        await tts.speak_async(reply, stop_speaking_evt)
+
+        is_speaking = False
+        await send(ws, {"type": "speaking_stop"})
+        logger.info("[Debug/think] Concluído.")
+
+
+# ─── Debug: texto → TTS direto ────────────────────────────────────────────
+async def run_debug_speak(ws: WebSocket, text: str):
+    """Pula STT e LLM: fala `text` diretamente via TTS."""
+    global is_speaking
+
+    if pipeline_lock.locked():
+        logger.warning("[Debug/speak] Pipeline em execução, ignorando.")
+        return
+
+    async with pipeline_lock:
+        logger.info(f"[Debug/speak] Texto: {text!r}")
+
+        lip_sync = tts.estimate_lip_sync(text)
+        is_speaking = True
+        stop_speaking_evt.clear()
+        await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
+
+        await tts.speak_async(text, stop_speaking_evt)
+
+        is_speaking = False
+        await send(ws, {"type": "speaking_stop"})
+        logger.info("[Debug/speak] Concluído.")
+
 # ─── WebSocket endpoint ───────────────────────────────────────────────────
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
@@ -183,6 +249,22 @@ async def websocket_endpoint(ws: WebSocket):
             elif mtype == "clear_history":
                 llm.clear_history()
                 await send(ws, {"type": "history_cleared"})
+
+            elif mtype == "debug_think":
+                # Debug: texto → LLM → TTS (pula STT)
+                text = msg.get("text", "").strip()
+                if text and not is_listening and not is_speaking:
+                    asyncio.create_task(run_debug_think(ws, loop, text))
+                elif not text:
+                    await send(ws, {"type": "error", "message": "debug_think requer campo 'text'."})
+
+            elif mtype == "debug_speak":
+                # Debug: texto → TTS direto (pula STT e LLM)
+                text = msg.get("text", "").strip()
+                if text and not is_listening and not is_speaking:
+                    asyncio.create_task(run_debug_speak(ws, text))
+                elif not text:
+                    await send(ws, {"type": "error", "message": "debug_speak requer campo 'text'."})
 
             else:
                 logger.warning(f"[WS] Mensagem desconhecida: {mtype}")
