@@ -80,6 +80,14 @@ class TTSEngine:
                     break
                 await self._engine.speak_async(text, stop_event, emotion=emotion)
 
+    async def preload(self) -> None:
+        """Pré-carrega o modelo em background se o engine suportar _ensure_model."""
+        if hasattr(self._engine, "_ensure_model"):
+            logger.info(f"[TTS] Pré-carregando modelo ({self.provider})...")
+            import asyncio
+            await asyncio.to_thread(self._engine._ensure_model)
+            logger.info(f"[TTS] Modelo ({self.provider}) pronto.")
+
     def stop(self) -> None:
         try:
             import pygame

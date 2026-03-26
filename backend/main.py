@@ -71,10 +71,16 @@ config = load_config()
 from stt import STTEngine
 from tts import TTSEngine
 from llm import LLMClient
+from wake_word import WakeWordDetector
 
 stt = STTEngine(config["stt"], config["audio"])
 tts = TTSEngine(config["tts"])
 llm = LLMClient(config["ai"])
+wake_detector = WakeWordDetector(
+    stt,
+    config.get("stt", {}).get("wake_word", {}),
+    config["audio"],
+)
 
 # ─── Estado global ────────────────────────────────────────────────────────
 active_ws: WebSocket | None = None
@@ -88,7 +94,49 @@ stop_speaking_evt = threading.Event()
 async def lifespan(app: FastAPI):
     global pipeline_lock
     pipeline_lock = asyncio.Lock()
+
+    async def _on_wake():
+        if active_ws and not is_listening and not is_speaking:
+            asyncio.create_task(run_pipeline(active_ws, asyncio.get_event_loop()))
+
+    async def _on_stop():
+        stop_speaking_evt.set()
+        tts.stop()
+
+    wake_detector.set_callbacks(_on_wake, _on_stop)
+
+    # Pré-carregamento de modelos em background (se habilitado no config)
+    perf_cfg = config.get("performance", {})
+    if perf_cfg.get("preload_models", False):
+        asyncio.create_task(_preload_models())
+
+    await wake_detector.start()
     yield
+    await wake_detector.stop()
+
+
+async def _preload_models():
+    """Carrega modelos TTS/STT em background e notifica o cliente via WS."""
+    # Aguarda cliente conectar (até 30s)
+    for _ in range(60):
+        if active_ws:
+            break
+        await asyncio.sleep(0.5)
+
+    async def _notify(provider: str, done: bool):
+        if active_ws:
+            await send(active_ws, {
+                "type": "model_loading",
+                "provider": provider,
+                "done": done,
+            })
+
+    await _notify(config.get("tts", {}).get("provider", "tts"), False)
+    try:
+        await tts.preload()
+    except Exception as e:
+        logger.warning(f"[Preload] Erro ao carregar modelo TTS: {e}")
+    await _notify(config.get("tts", {}).get("provider", "tts"), True)
 
 # ─── App FastAPI ──────────────────────────────────────────────────────────
 app = FastAPI(title="AI Assistant Backend", lifespan=lifespan)
@@ -140,17 +188,48 @@ def _display_text(segments: list[tuple[str, str]]) -> str:
 
 
 async def _speak_reply(ws: WebSocket, segments: list[tuple[str, str]]) -> None:
-    """Reproduz os segmentos de resposta, garantindo reset de is_speaking via try/finally."""
+    """Reproduz os segmentos de resposta frase a frase, emitindo phrase_start/phrase_end por segmento."""
     global is_speaking
-    display = _display_text(segments)
-    lip_sync = tts.estimate_lip_sync(display)
+
+    cfg_tts      = config.get("tts", {})
+    tts_enabled  = cfg_tts.get("enabled", True)
+    inter_delay  = cfg_tts.get("inter_phrase_delay_ms", 600) / 1000.0
+    bubble_secs  = cfg_tts.get("bubble_display_ms", 4000) / 1000.0
+
     is_speaking = True
+    wake_detector.set_speaking(True)
     stop_speaking_evt.clear()
-    await send(ws, {"type": "speaking_start", "lip_sync": lip_sync})
+    await send(ws, {"type": "speaking_start"})
+
     try:
-        await tts.speak_segments_async(segments, stop_speaking_evt)
+        for i, (emotion, text) in enumerate(segments):
+            if stop_speaking_evt.is_set():
+                break
+
+            is_last = (i == len(segments) - 1)
+            lip_sync = tts.estimate_lip_sync(text) if tts_enabled else []
+
+            await send(ws, {
+                "type": "phrase_start",
+                "text": text,
+                "emotion": emotion,
+                "lip_sync": lip_sync,
+            })
+
+            if tts_enabled:
+                await tts.speak_segments_async([(emotion, text)], stop_speaking_evt)
+            else:
+                # Duração proporcional ao tamanho do texto, mínimo bubble_secs
+                duration = max(bubble_secs, len(text) * 0.060)
+                await asyncio.sleep(duration)
+
+            # Emite phrase_end só entre frases (não na última — speaking_stop cuida disso)
+            if not is_last and not stop_speaking_evt.is_set():
+                await send(ws, {"type": "phrase_end"})
+                await asyncio.sleep(inter_delay)
     finally:
         is_speaking = False
+        wake_detector.set_speaking(False)
         await send(ws, {"type": "speaking_stop"})
 
 
@@ -166,12 +245,14 @@ async def run_pipeline(ws: WebSocket, loop: asyncio.AbstractEventLoop):
     async with pipeline_lock:
         # 1. Iniciar escuta
         is_listening = True
+        wake_detector.set_mic_busy(True)
         await send(ws, {"type": "listening_start"})
         logger.info("[Pipeline] Gravando...")
         try:
             audio = await loop.run_in_executor(None, stt.record_until_silence)
         finally:
             is_listening = False
+            wake_detector.set_mic_busy(False)
             await send(ws, {"type": "listening_stop"})
 
         # 2. Transcrição

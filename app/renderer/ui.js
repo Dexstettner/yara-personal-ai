@@ -6,19 +6,23 @@ const WS_URL  = 'ws://localhost:8765/ws';
 const RECONNECT_DELAY = 3000;
 
 let ws = null;
-let isListening = false;
-let isSpeaking  = false;
-let config      = {};
+let isListening   = false;
+let isSpeaking    = false;
+let config        = {};
 let chatHideTimer = null;
+let twTimer       = null;
 
 // ─── Elementos ──────────────────────────────────────────────────────────────
-const btnListen     = document.getElementById('btn-listen');
-const btnStop       = document.getElementById('btn-stop');
-const statusDot     = document.getElementById('status-dot');
-const statusText    = document.getElementById('status-text');
-const chatBubble    = document.getElementById('chat-bubble');
-const bubbleText    = document.getElementById('bubble-text');
-const btnMinimize   = document.getElementById('btn-minimize');
+const btnListen        = document.getElementById('btn-listen');
+const btnStop          = document.getElementById('btn-stop');
+const statusDot        = document.getElementById('status-dot');
+const statusText       = document.getElementById('status-text');
+const yaraBubble       = document.getElementById('yara-bubble');
+const userBubble       = document.getElementById('user-bubble');
+const userMsgEl        = document.getElementById('user-msg');
+const typingEl         = document.getElementById('typing-indicator');
+const assistantMsgEl   = document.getElementById('assistant-msg');
+const btnMinimize      = document.getElementById('btn-minimize');
 
 // ─── Inicialização ──────────────────────────────────────────────────────────
 async function init() {
@@ -72,6 +76,7 @@ function handleMessage(msg) {
       window.avatarCtrl?.setState('listening');
       isListening = true;
       btnListen.classList.add('active');
+      resetBubbleContent();
       break;
 
     case 'listening_stop':
@@ -79,14 +84,15 @@ function handleMessage(msg) {
       window.avatarCtrl?.setState('thinking');
       isListening = false;
       btnListen.classList.remove('active');
+      showTyping();
       break;
 
     case 'transcript':
-      showBubble(`Você: ${msg.text}`, false);
+      showUserMsg(msg.text);
       break;
 
     case 'reply_text':
-      showBubble(msg.text, true);
+      // informativo — exibição agora é controlada por phrase_start
       break;
 
     case 'speaking_start':
@@ -94,7 +100,14 @@ function handleMessage(msg) {
       window.avatarCtrl?.setState('speaking');
       isSpeaking = true;
       btnStop.classList.remove('hidden');
-      if (msg.lip_sync) window.avatarCtrl?.setLipSync(msg.lip_sync);
+      break;
+
+    case 'phrase_start':
+      showPhrase(msg.text, msg.lip_sync);
+      break;
+
+    case 'phrase_end':
+      endPhrase();
       break;
 
     case 'speaking_stop':
@@ -102,13 +115,28 @@ function handleMessage(msg) {
       window.avatarCtrl?.setState('idle');
       isSpeaking = false;
       btnStop.classList.add('hidden');
-      scheduleBubbleHide(6000);
+      scheduleBubbleHide(7000);
+      break;
+
+    case 'model_loading':
+      if (!msg.done) {
+        setStatus('thinking', `Carregando ${msg.provider}...`);
+        window.avatarCtrl?.setState('thinking');
+      } else {
+        setStatus('idle', 'Pronta');
+        window.avatarCtrl?.setState('idle');
+      }
+      break;
+
+    case 'history_cleared':
+      hideBubble(true);
       break;
 
     case 'error':
       setStatus('error', 'Erro');
-      showBubble(`Erro: ${msg.message}`, false);
+      showAssistantMsg(`❌ ${msg.message}`);
       window.avatarCtrl?.setState('idle');
+      scheduleBubbleHide(5000);
       break;
 
     default:
@@ -121,7 +149,11 @@ function setupControls() {
   btnListen.addEventListener('click', toggleListen);
   btnStop.addEventListener('click', () => sendWS('stop_speaking'));
   btnMinimize.addEventListener('click', () => window.electronAPI?.minimizeToTray());
+  document.getElementById('btn-reset-pos')?.addEventListener('click', () => {
+    window.electronAPI?.resetPosition();
+  });
   setupDebugPanel();
+  setupResize();
 }
 
 function setupDebugPanel() {
@@ -189,22 +221,130 @@ function setStatus(state, text) {
   statusText.textContent = text;
 }
 
-function showBubble(text, isAssistant) {
-  if (chatHideTimer) {
-    clearTimeout(chatHideTimer);
-    chatHideTimer = null;
-  }
-  bubbleText.textContent = text;
-  chatBubble.classList.remove('hidden');
-  chatBubble.style.borderColor = isAssistant
-    ? 'rgba(180, 40, 100, 0.5)'
-    : 'rgba(60, 100, 200, 0.4)';
+// ─── Balões de fala ───────────────────────────────────────────────────────
+function openYaraBubble() {
+  if (chatHideTimer) { clearTimeout(chatHideTimer); chatHideTimer = null; }
+  yaraBubble.classList.add('bubble-visible');
+}
+
+function openUserBubble() {
+  userBubble.classList.add('bubble-visible');
+}
+
+function hideBubble(immediately = false) {
+  if (chatHideTimer) { clearTimeout(chatHideTimer); chatHideTimer = null; }
+  stopTypeWriter();
+  yaraBubble.classList.remove('bubble-visible');
+  userBubble.classList.remove('bubble-visible');
+  setTimeout(resetBubbleContent, immediately ? 0 : 380);
 }
 
 function scheduleBubbleHide(ms) {
-  chatHideTimer = setTimeout(() => {
-    chatBubble.classList.add('hidden');
-  }, ms);
+  chatHideTimer = setTimeout(() => hideBubble(), ms);
+}
+
+function resetBubbleContent() {
+  userMsgEl.textContent = '';
+  userMsgEl.classList.remove('visible');
+  typingEl.classList.remove('visible');
+  assistantMsgEl.textContent = '';
+  assistantMsgEl.classList.remove('visible');
+}
+
+function showUserMsg(text) {
+  userMsgEl.textContent = 'você › ' + text;
+  userMsgEl.classList.add('visible');
+  openUserBubble();
+}
+
+function showTyping() {
+  typingEl.classList.add('visible');
+  assistantMsgEl.classList.remove('visible');
+  openYaraBubble();
+}
+
+function showAssistantMsg(text) {
+  typingEl.classList.remove('visible');
+  assistantMsgEl.classList.add('visible');
+  typeWriter(assistantMsgEl, text);
+  openYaraBubble();
+}
+
+// Exibe uma frase individual (phrase_start)
+function showPhrase(text, lipSync) {
+  stopTypeWriter();
+  typingEl.classList.remove('visible');
+  assistantMsgEl.textContent = '';
+  assistantMsgEl.classList.add('visible');
+  typeWriter(assistantMsgEl, text);
+  if (lipSync && lipSync.length) window.avatarCtrl?.setLipSync(lipSync);
+  openYaraBubble();
+}
+
+// Esconde o balão entre frases (phrase_end)
+function endPhrase() {
+  yaraBubble.classList.remove('bubble-visible');
+  stopTypeWriter();
+}
+
+// ─── Typewriter ───────────────────────────────────────────────────────────
+function stopTypeWriter() {
+  if (twTimer) { clearInterval(twTimer); twTimer = null; }
+  // Remove cursor pendente
+  const cursor = assistantMsgEl.querySelector('.tw-cursor');
+  if (cursor) cursor.remove();
+}
+
+function typeWriter(el, text, speed = 22) {
+  stopTypeWriter();
+  el.textContent = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'tw-cursor';
+  el.appendChild(cursor);
+  let i = 0;
+  twTimer = setInterval(() => {
+    if (i < text.length) {
+      el.insertBefore(document.createTextNode(text[i++]), cursor);
+    } else {
+      clearInterval(twTimer);
+      twTimer = null;
+      cursor.remove();
+    }
+  }, speed);
+}
+
+// ─── Resize grip ─────────────────────────────────────────────────────────
+function setupResize() {
+  const grip = document.getElementById('resize-grip');
+  if (!grip || !window.electronAPI) return;
+
+  let resizing = false;
+  let startX, startY, startW, startH;
+
+  grip.addEventListener('mousedown', async (e) => {
+    if (e.button !== 0) return;
+    resizing = true;
+    startX = e.screenX;
+    startY = e.screenY;
+    const size = await window.electronAPI.getWindowSize();
+    startW = size[0];
+    startH = size[1];
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    window.electronAPI.resizeWindow(
+      startW + (e.screenX - startX),
+      startH + (e.screenY - startY)
+    );
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!resizing) return;
+    resizing = false;
+    window.electronAPI.saveWindowSize();
+  });
 }
 
 // ─── Orientação do avatar (vira para o centro da tela) ───────────────────

@@ -4,11 +4,11 @@
 
 class AvatarController {
   constructor() {
-    this.avatarImg  = document.getElementById('avatar-img');
-    this.fxCanvas   = document.getElementById('fx-canvas');
+    this.avatarImg   = document.getElementById('avatar-img');
+    this.fxCanvas    = document.getElementById('fx-canvas');
     this.mouthCanvas = document.getElementById('mouth-canvas');
-    this.fxCtx      = this.fxCanvas.getContext('2d');
-    this.mouthCtx   = this.mouthCanvas.getContext('2d');
+    this.fxCtx       = this.fxCanvas.getContext('2d');
+    this.mouthCtx    = this.mouthCanvas.getContext('2d');
 
     this.state = 'idle'; // idle | listening | thinking | speaking
     this.particles = [];
@@ -18,8 +18,28 @@ class AvatarController {
     this.lipSyncData = [];   // array de amplitudes
     this.lipSyncIndex = 0;
 
+    // ─── Idle animations ──────────────────────────────────────────────────
+    this._blinkPhase   = null;   // null = sem blink, 0-1 = progresso da animação
+    this._blinkTimer   = null;
+    this._lookTimer    = null;
+    this._lookActive   = false;
+
     this._resize();
     window.addEventListener('resize', () => this._resize());
+
+    // Aplica escala configurada
+    const cfg = window._avatarConfig || {};
+    const scale = cfg.avatar_scale || 1.0;
+    if (scale !== 1.0) {
+      document.getElementById('avatar-wrapper').style.zoom = scale;
+    }
+
+    // Inicia animações idle se habilitado
+    if (cfg.idle_animation !== false) {
+      this._scheduleBlink();
+      this._scheduleLookAround();
+    }
+
     this._loop();
   }
 
@@ -68,8 +88,10 @@ class AvatarController {
 
     this._updateParticles();
     this._drawParticles();
+    this._drawBlink();          // idle animation: piscada no canvas de efeitos
     this._updateMouth();
     this._drawMouth();
+    this._positionMouthCanvas(); // reposiciona a cada frame p/ seguir look-around
   }
 
   // ─── Efeito de escuta (ondas azuis) ─────────────────────────────────────
@@ -212,6 +234,62 @@ class AvatarController {
     ctx.stroke();
   }
 
+  // ─── Idle: piscada ───────────────────────────────────────────────────────
+  _scheduleBlink() {
+    const delay = 3000 + Math.random() * 5000;   // 3–8 s entre piscadas
+    this._blinkTimer = setTimeout(() => {
+      if (this.state === 'idle') this._blinkPhase = 0;
+      this._scheduleBlink();
+    }, delay);
+  }
+
+  _drawBlink() {
+    if (this._blinkPhase === null) return;
+
+    const imgRect = this.avatarImg.getBoundingClientRect();
+    if (!imgRect.width) { this._blinkPhase = null; return; }
+
+    // Avança fase (60fps ≈ 9 frames para 150ms)
+    this._blinkPhase += 0.12;
+    if (this._blinkPhase >= 1) { this._blinkPhase = null; return; }
+
+    const cfg       = window._avatarConfig || {};
+    const eyeY      = cfg.eye_y_offset || 0.28;   // 28% do topo por padrão
+    const intensity = Math.sin(this._blinkPhase * Math.PI);  // curva 0→1→0
+
+    const cx = imgRect.left + imgRect.width  * 0.5;
+    const cy = imgRect.top  + imgRect.height * eyeY;
+    const w  = imgRect.width  * 0.62;
+    const h  = imgRect.height * 0.065 * intensity;
+
+    this.fxCtx.fillStyle = `rgba(15, 8, 28, ${0.88 * intensity})`;
+    this.fxCtx.beginPath();
+    this.fxCtx.ellipse(cx, cy, w / 2, Math.max(1, h / 2), 0, 0, Math.PI * 2);
+    this.fxCtx.fill();
+  }
+
+  // ─── Idle: olhar para o lado ─────────────────────────────────────────────
+  _scheduleLookAround() {
+    const delay = 8000 + Math.random() * 12000;  // 8–20 s entre movimentos
+    this._lookTimer = setTimeout(() => {
+      if (this.state === 'idle' && !this._lookActive) {
+        this._lookActive = true;
+        const dx = (Math.random() - 0.5) * 14;   // ±7 px horizontal
+        const dy = (Math.random() - 0.5) *  6;   // ±3 px vertical
+        this.avatarImg.style.marginLeft = `${dx}px`;
+        this.avatarImg.style.marginTop  = `${dy}px`;
+
+        // Volta à posição central após 900ms
+        setTimeout(() => {
+          this.avatarImg.style.marginLeft = '0px';
+          this.avatarImg.style.marginTop  = '0px';
+          this._lookActive = false;
+        }, 900);
+      }
+      this._scheduleLookAround();
+    }, delay);
+  }
+
   // ─── API pública ─────────────────────────────────────────────────────────
   setState(state) {
     this.state = state;
@@ -219,6 +297,13 @@ class AvatarController {
 
     if (state === 'speaking')  this.avatarImg.classList.add('speaking');
     if (state === 'listening') this.avatarImg.classList.add('listening');
+
+    // Ao sair do idle: cancela look-around visual imediatamente
+    if (state !== 'idle' && this._lookActive) {
+      this.avatarImg.style.marginLeft = '0px';
+      this.avatarImg.style.marginTop  = '0px';
+      this._lookActive = false;
+    }
 
     if (state !== 'speaking') {
       this.lipSyncData  = [];

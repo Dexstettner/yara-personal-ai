@@ -29,6 +29,7 @@ class WakeWordDetector:
         self._enabled     = cfg.get("enabled", True)
         self._task        = None
         self._mic_busy    = threading.Event()  # sinaliza que STT principal está gravando
+        self._is_speaking = False               # IA está falando (chunk menor para resposta rápida)
 
         self._on_wake     = None
         self._on_stop     = None
@@ -47,13 +48,24 @@ class WakeWordDetector:
         else:
             self._mic_busy.clear()
 
+    def set_speaking(self, speaking: bool):
+        """Chame com True quando a IA começar a falar, False ao terminar.
+        Reduz chunk_duration para 0.6s durante a fala, permitindo detecção rápida de 'pare'."""
+        self._is_speaking = speaking
+
     async def start(self):
         if not self._enabled:
             logger.info("[WakeWord] Desativado no config.")
             return
         if not self.stt.model:
-            logger.warning("[WakeWord] Whisper não carregado, wake word desativado.")
-            return
+            logger.info("[WakeWord] Aguardando Whisper carregar (até 60s)...")
+            for _ in range(60):
+                await asyncio.sleep(1)
+                if self.stt.model:
+                    break
+            if not self.stt.model:
+                logger.warning("[WakeWord] Whisper não carregou em 60s, wake word desativado.")
+                return
         self._task = asyncio.create_task(self._loop())
         logger.info(f"[WakeWord] Ativo | ativação: {self.wake_phrases} | parada: {self.stop_phrases}")
 
@@ -73,13 +85,16 @@ class WakeWordDetector:
         loop      = asyncio.get_event_loop()
         sr        = self.cfg_audio.get("sample_rate", 16000)
         device    = self.cfg_audio.get("input_device_index")
-        samples   = int(sr * self.chunk_dur)
 
         while True:
             # Espera o microfone ficar livre (STT principal gravando)
             if self._mic_busy.is_set():
                 await asyncio.sleep(0.2)
                 continue
+
+            # Chunk menor durante fala da IA para detectar "pare" mais rápido
+            chunk_dur = 0.6 if self._is_speaking else self.chunk_dur
+            samples   = int(sr * chunk_dur)
 
             try:
                 # Grava chunk curto em thread separada

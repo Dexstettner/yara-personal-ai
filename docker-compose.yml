@@ -1,0 +1,62 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yara-backend:latest
+    container_name: yara-backend
+
+    # ── GPU ──────────────────────────────────────────────────────────────────
+    # Requer: Docker Desktop com suporte GPU ativado (WSL2 + driver NVIDIA)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # ── Rede ──────────────────────────────────────────────────────────────────
+    ports:
+      - "8765:8765"
+
+    # host.docker.internal resolve para o host Windows (Ollama, PulseAudio)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # ── Volumes ───────────────────────────────────────────────────────────────
+    volumes:
+      # Config montado como read-write (main.js salva posição da janela)
+      - ./config.json:/app/config.json
+
+      # Assets e modelos locais (somente leitura)
+      - ./assets:/app/assets:ro
+      - ./models:/app/models:ro
+
+      # Cache HuggingFace — evita re-download a cada rebuild
+      - hf-cache:/root/.cache/huggingface
+
+      # Cache faster-whisper — modelos Whisper
+      - whisper-cache:/root/.cache/faster_whisper
+
+    # ── Variáveis de ambiente ─────────────────────────────────────────────────
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONUTF8: "1"
+
+      # GPU
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+      # Áudio via PulseAudio TCP no host
+      # Requer PulseAudio rodando no Windows com TCP habilitado (porta 4713)
+      # Veja: docs/docker-audio-setup.md
+      PULSE_SERVER: tcp:host.docker.internal:4713
+      SDL_AUDIODRIVER: pulse
+
+    restart: unless-stopped
+
+# ── Volumes nomeados ──────────────────────────────────────────────────────────
+volumes:
+  hf-cache:
+  whisper-cache:

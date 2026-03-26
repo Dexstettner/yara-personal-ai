@@ -12,6 +12,7 @@
     <div id="drag-region"></div>
     <div id="window-controls">
       <button id="btn-debug-toggle" title="Painel de debug">⚙</button>
+      <button id="btn-reset-pos" title="Reposicionar janela">⌖</button>
       <button id="btn-minimize" title="Minimizar para bandeja">—</button>
     </div>
   </div>
@@ -27,6 +28,13 @@
         <!-- Sobreposição da boca para lip-sync -->
         <canvas id="mouth-canvas"></canvas>
       </div>
+      <!-- Balão de fala da Yara (posicionado sobre a sprite) -->
+      <div id="yara-bubble">
+        <div id="typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
+        <div id="assistant-msg"></div>
+      </div>
       <!-- Indicador de estado -->
       <div id="status-indicator">
         <div id="status-dot"></div>
@@ -34,9 +42,9 @@
       </div>
     </div>
 
-    <!-- Balão de chat -->
-    <div id="chat-bubble" class="hidden">
-      <div id="bubble-text"></div>
+    <!-- Balão do usuário (abaixo) -->
+    <div id="user-bubble">
+      <div id="user-msg"></div>
     </div>
 
     <!-- Controles inferiores -->
@@ -70,6 +78,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Grip de redimensionamento (canto inferior direito) -->
+  <div id="resize-grip"></div>
 
   <script src="avatar.js"></script>
   <script src="ui.js"></script>

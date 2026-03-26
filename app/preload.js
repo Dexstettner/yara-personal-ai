@@ -11,4 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConfig: () => ipcRenderer.invoke('get-config'),
   getPosition: () => ipcRenderer.invoke('get-position'),
   moveWindow: (x, y) => ipcRenderer.send('move-window', { x, y }),
+
+  // Redimensionamento e posição
+  getWindowSize: () => ipcRenderer.invoke('get-window-size'),
+  resizeWindow: (w, h) => ipcRenderer.send('resize-window', { w, h }),
+  saveWindowSize: () => ipcRenderer.send('save-window-size'),
+  resetPosition: () => ipcRenderer.send('reset-position'),
 });

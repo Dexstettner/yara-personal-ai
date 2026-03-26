@@ -104,7 +104,14 @@ function startBackend() {
 app.whenReady().then(() => {
   createWindow();
   createTray();
-  startBackend();
+
+  // Quando EXTERNAL_BACKEND=1, o backend já está rodando externamente (ex: Docker).
+  // Electron apenas conecta ao WebSocket sem spawnar Python.
+  if (!process.env.EXTERNAL_BACKEND) {
+    startBackend();
+  } else {
+    console.log('[Backend] Modo externo — conectando ao backend em execução na porta 8765');
+  }
 
   // Hotkey global para ativar escuta
   const hotkeyListen = config.app.hotkey_listen;
@@ -159,4 +166,39 @@ ipcMain.handle('get-config', () => {
 // IPC: minimizar / fechar para tray
 ipcMain.on('minimize-to-tray', () => {
   if (mainWindow) mainWindow.hide();
+});
+
+// IPC: obter tamanho atual da janela
+ipcMain.handle('get-window-size', () => {
+  return mainWindow ? mainWindow.getSize() : [400, 700];
+});
+
+// IPC: redimensionar janela (drag do resize-grip)
+ipcMain.on('resize-window', (_, { w, h }) => {
+  if (!mainWindow) return;
+  const minW = 180, minH = 280, maxW = 900, maxH = 1400;
+  mainWindow.setSize(
+    Math.round(Math.max(minW, Math.min(maxW, w))),
+    Math.round(Math.max(minH, Math.min(maxH, h)))
+  );
+});
+
+// IPC: salvar tamanho atual em config.json
+ipcMain.on('save-window-size', () => {
+  if (!mainWindow) return;
+  const [w, h] = mainWindow.getSize();
+  config.avatar.window_width  = w;
+  config.avatar.window_height = h;
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+});
+
+// IPC: reposicionar janela para canto inferior direito
+ipcMain.on('reset-position', () => {
+  if (!mainWindow) return;
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const [w, h] = mainWindow.getSize();
+  mainWindow.setPosition(width - w - 20, height - h - 20);
+  config.avatar.position_x = width - w - 20;
+  config.avatar.position_y = height - h - 20;
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
 });

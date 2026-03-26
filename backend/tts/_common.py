@@ -13,15 +13,18 @@ logger = logging.getLogger(__name__)
 
 # ── Reproducao de audio via pygame ───────────────────────────────────────────
 
-async def play_file(path: str, stop_event) -> None:
-    """Reproduz arquivo de audio (mp3/wav) via pygame e aguarda terminar."""
+async def play_file(path: str, stop_event, fade_ms: int = 150) -> None:
+    """Reproduz arquivo de audio (mp3/wav) via pygame e aguarda terminar.
+    Ao receber stop_event, aplica fadeout suave em vez de cortar abruptamente."""
     import pygame
     try:
         pygame.mixer.music.load(path)
         pygame.mixer.music.play()
         while pygame.mixer.music.get_busy():
             if stop_event.is_set():
-                pygame.mixer.music.stop()
+                pygame.mixer.music.fadeout(fade_ms)
+                # Aguarda o fade terminar antes de prosseguir
+                await asyncio.sleep(fade_ms / 1000 + 0.05)
                 break
             await asyncio.sleep(0.05)
     finally:

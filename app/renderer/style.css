@@ -81,6 +81,84 @@ html, body {
   justify-content: flex-end;
 }
 
+/* ===== Balão da Yara (absoluto, canto superior, diagonal) ===== */
+#yara-bubble {
+  position: absolute;
+  top: 32px;
+  right: 8px;
+  width: 68%;
+  background: #fdf0ff;
+  border: 2.5px solid #130a22;
+  border-radius: 20px;
+  padding: 10px 14px;
+  color: #130a22;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 6;
+  box-shadow: 3px 3px 0 #130a22, 0 0 0 3px rgba(210, 60, 130, 0.18);
+  opacity: 0;
+  transform: scale(0.85) translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.32s ease,
+              transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Cauda externa (borda) — aponta para baixo-esquerda, em direção à face da Yara */
+#yara-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -15px;
+  left: 20px;
+  width: 0;
+  height: 0;
+  border-top: 15px solid #130a22;
+  border-right: 14px solid transparent;
+}
+
+/* Cauda interna (preenchimento) */
+#yara-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 24px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid #fdf0ff;
+  border-right: 9px solid transparent;
+}
+
+#yara-bubble.bubble-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+/* Espelhamento quando o avatar está virado para a esquerda */
+#avatar-frame.flipped ~ #yara-bubble {
+  right: auto;
+  left: 8px;
+}
+
+#avatar-frame.flipped ~ #yara-bubble::before {
+  left: auto;
+  right: 20px;
+  border-right: none;
+  border-left: 14px solid transparent;
+}
+
+#avatar-frame.flipped ~ #yara-bubble::after {
+  left: auto;
+  right: 24px;
+  border-right: none;
+  border-left: 9px solid transparent;
+}
+
 #fx-canvas {
   position: absolute;
   top: 0;
@@ -115,7 +193,8 @@ html, body {
   animation: idle-breathe 4s ease-in-out infinite;
   transform-origin: bottom center;
   filter: drop-shadow(0 0 0px rgba(180, 0, 80, 0));
-  transition: filter 0.5s ease;
+  /* Transição para filter + look-around (margin) */
+  transition: filter 0.5s ease, margin-left 0.55s ease, margin-top 0.45s ease;
 }
 
 #avatar-img.speaking {
@@ -186,32 +265,96 @@ html, body {
   letter-spacing: 0.5px;
 }
 
-/* ===== Chat Bubble ===== */
-#chat-bubble {
-  max-width: 88%;
-  background: rgba(20, 10, 30, 0.82);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(180, 40, 100, 0.4);
-  border-radius: 16px;
-  padding: 10px 14px;
-  margin: 0 auto 8px;
-  color: #f0e0f0;
-  font-size: 13px;
-  line-height: 1.5;
-  max-height: 120px;
-  overflow-y: auto;
-  transition: opacity 0.3s, transform 0.3s;
+/* ===== Balão do Usuário (abaixo, estilo manga dark) ===== */
+#user-bubble {
+  position: relative;
+  max-width: 82%;
+  background: rgba(18, 8, 32, 0.93);
+  border: 2px solid rgba(160, 50, 120, 0.65);
+  border-radius: 14px;
+  padding: 7px 13px;
+  margin: 4px auto 6px;
+  display: flex;
+  align-items: center;
   z-index: 10;
-}
-
-#chat-bubble.hidden {
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(180, 60, 130, 0.12);
   opacity: 0;
+  transform: scale(0.9) translateY(6px);
   pointer-events: none;
-  transform: translateY(6px);
+  transition: opacity 0.28s ease,
+              transform 0.33s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-#bubble-text {
+#user-bubble.bubble-visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+/* Mensagem do usuário */
+#user-msg {
+  font-size: 11px;
+  font-weight: 500;
+  font-style: italic;
+  color: rgba(215, 170, 235, 0.85);
   word-break: break-word;
+  display: block;
+}
+
+#user-msg.visible { display: block; }
+
+/* Indicador de digitação (dots) */
+#typing-indicator {
+  display: none;
+  gap: 5px;
+  align-items: center;
+  padding: 2px 0;
+}
+
+#typing-indicator.visible {
+  display: flex;
+}
+
+#typing-indicator span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #c0206e;
+  border: 1.5px solid #130a22;
+  animation: typing-bounce 1.1s ease-in-out infinite;
+}
+
+#typing-indicator span:nth-child(2) { animation-delay: 0.18s; }
+#typing-indicator span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0);   opacity: 0.7; }
+  30%            { transform: translateY(-7px); opacity: 1;   }
+}
+
+/* Resposta da assistente (dentro do #yara-bubble — herda cor escura) */
+#assistant-msg {
+  word-break: break-word;
+  display: none;
+}
+
+#assistant-msg.visible { display: block; }
+
+/* Cursor do typewriter */
+.tw-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  background: #c0206e;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: tw-blink 0.65s ease-in-out infinite;
+}
+
+@keyframes tw-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
 }
 
 /* ===== Controles ===== */
@@ -345,6 +488,37 @@ html, body {
 .debug-row button:active {
   transform: scale(0.94);
 }
+
+/* ===== Resize Grip ===== */
+#resize-grip {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  cursor: nwse-resize;
+  z-index: 200;
+  -webkit-app-region: no-drag;
+}
+
+#resize-grip::before,
+#resize-grip::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  border-color: rgba(180, 40, 100, 0.5);
+  border-style: solid;
+  border-width: 0 2px 2px 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+#resize-grip::before { width: 8px; height: 8px; }
+#resize-grip::after  { width: 4px; height: 4px; right: 9px; bottom: 9px; }
+
+#resize-grip:hover::before,
+#resize-grip:hover::after { opacity: 1; }
 
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 4px; }

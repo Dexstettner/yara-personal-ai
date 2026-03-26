@@ -1,0 +1,20 @@
+node_modules/
+.git/
+dist/
+app/
+docs/
+
+# Logs
+*.log
+backend/app.log
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Modelos grandes (montados como volume no compose)
+models/
+
+# Env local
+.env
