@@ -1,9 +1,11 @@
+# Yara — Personal AI Desktop Assistant
+
+Assistente de IA desktop com avatar animado, voz e personalidade. Roda localmente com Whisper para reconhecimento de fala (STT), múltiplos engines de TTS e suporte a LLMs via Ollama, API da Anthropic ou modelos GGUF locais.
+
+---
+
 <div align="center">
-<pre>
-                                                                                          
-                                                                                          
-                                                                                          
-                                                                                          
+<pre>              
                                             ##mmMM@@--  ##++                              
                                         ########################                          
               ::                    @@############################                        
@@ -69,10 +71,6 @@
                                                                                           
 </pre>
 </div>
-
-# Yara — Personal AI Desktop Assistant
-
-Assistente de IA desktop com avatar animado, voz e personalidade. Roda localmente com Whisper para reconhecimento de fala (STT), múltiplos engines de TTS e suporte a LLMs via Ollama, API da Anthropic ou modelos GGUF locais.
 
 ---
 
