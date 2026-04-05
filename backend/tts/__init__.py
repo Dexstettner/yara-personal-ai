@@ -4,7 +4,6 @@ Troque o provider em config.json -> tts.provider
 
   chatterbox  : clonagem de voz offline (~4-7 GB VRAM)
   edge-tts    : vozes Microsoft (requer internet, sem API key)
-  voicevox    : vozes anime japonesas (servidor VOICEVOX local)
   fish-speech : vozes multilingual (Fish Speech server local)
   f5-tts      : flow matching TTS, leve (~300 MB VRAM)
   elevenlabs  : vozes premium (requer internet + API key)
@@ -16,7 +15,6 @@ import re
 
 from .chatterbox  import ChatterboxTTS
 from .edge_tts    import EdgeTTS
-from .voicevox    import VoiceVox
 from .fish_speech import FishSpeech
 from .f5_tts      import F5TTS
 from .elevenlabs  import ElevenLabsTTS
@@ -26,7 +24,6 @@ logger = logging.getLogger(__name__)
 _ENGINES: dict[str, tuple[type, str]] = {
     "chatterbox":  (ChatterboxTTS,  "chatterbox"),
     "edge-tts":    (EdgeTTS,        "edge_tts"),
-    "voicevox":    (VoiceVox,       "voicevox"),
     "fish-speech": (FishSpeech,     "fish_speech"),
     "f5-tts":      (F5TTS,          "f5_tts"),
     "elevenlabs":  (ElevenLabsTTS,  "elevenlabs"),

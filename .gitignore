@@ -1,12 +1,18 @@
 # Dependências
 node_modules/
 models/
+
+# Build Tauri (binários compilados, ~7 GB)
+src-tauri/target/
 **/__pycache__/
 .claude/
 
 # Logs
 *.log
 app.log
+
+# Docs e anotações
+docs/*
 
 # Env
 .env

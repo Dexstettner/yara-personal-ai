@@ -1,0 +1,15 @@
+[[permission]]
+identifier = "allow-app-commands"
+description = "Allows all custom application commands"
+commands.allow = [
+  "start_dragging",
+  "get_config",
+  "save_position",
+  "get_position",
+  "move_window",
+  "get_window_size",
+  "resize_window",
+  "save_window_size",
+  "minimize_to_tray",
+  "reset_position"
+]

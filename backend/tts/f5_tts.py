@@ -42,7 +42,7 @@ class F5TTS:
 
     def __init__(self, cfg: dict):
         self.device          = cfg.get("device",          "cuda")
-        self.reference_audio = cfg.get("reference_audio", "assets/reference_voice.wav")
+        self.reference_audio = cfg.get("reference_audio", "backend/assets/reference_voice.wav")
         self.ref_text        = cfg.get("ref_text",        "")
         self.model_name      = cfg.get("model",           "F5TTS_v1_Base")
         self.speed           = cfg.get("speed",           1.0)

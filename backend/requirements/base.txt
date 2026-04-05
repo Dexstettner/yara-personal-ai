@@ -13,8 +13,11 @@ sounddevice>=0.4.7
 # numpy < 2.0 obrigatório — ctranslate2 (faster-whisper) quebra com 2.x
 numpy>=1.26.4,<2.0
 
-# HTTP client para providers remotos (voicevox, fish-speech, elevenlabs)
+# HTTP client para providers remotos (fish-speech, elevenlabs)
 aiohttp>=3.9.0
+
+# HTTP client assíncrono para comunicação entre microserviços
+httpx>=0.27.0
 
 # Utilitários
 python-dotenv>=1.0.1

@@ -1,56 +1,50 @@
 @echo off
+chcp 65001 >nul
 echo =============================================
-echo   AI Assistant - Instalacao
+echo   AI Assistant - Instalacao (Tauri/Rust)
 echo =============================================
 echo.
 
-:: Verifica Node.js
-where node >nul 2>&1
+:: Verifica Rust/Cargo
+where cargo >nul 2>&1
 if errorlevel 1 (
-    echo [ERRO] Node.js nao encontrado!
-    echo Baixe em: https://nodejs.org
+    echo [ERRO] Rust/Cargo nao encontrado!
+    echo Instale em: https://rustup.rs/
     pause
     exit /b 1
 )
-echo [OK] Node.js encontrado
+echo [OK] Rust/Cargo encontrado
 
-:: Verifica Python
-where python >nul 2>&1
-if errorlevel 1 (
-    echo [ERRO] Python nao encontrado!
-    echo Baixe em: https://www.python.org/downloads/
-    pause
-    exit /b 1
-)
-echo [OK] Python encontrado
-
+:: Instala Tauri CLI (necessario para cargo tauri dev / build)
 echo.
-echo --- Instalando dependencias Node.js ---
-call npm install
+echo --- Instalando Tauri CLI ---
+cargo install tauri-cli --version "^2" --locked
 if errorlevel 1 (
-    echo [ERRO] Falha ao instalar pacotes Node.js
-    pause
-    exit /b 1
+    echo [AVISO] Falha ao instalar tauri-cli (pode ja estar instalado)
 )
-echo [OK] Pacotes Node instalados
+echo [OK] Tauri CLI verificado
 
+:: Instala dependencias Python do backend
 echo.
-echo --- Instalando dependencias Python ---
-pip install -r backend\requirements.txt
+echo --- Instalando dependencias do backend Python ---
+where conda >nul 2>&1
+if not errorlevel 1 (
+    call conda activate yara 2>nul
+)
+pip install -r backend\requirements\base.txt
 if errorlevel 1 (
-    echo [ERRO] Falha ao instalar pacotes Python
+    echo [ERRO] Falha ao instalar pacotes do backend
     pause
     exit /b 1
 )
-echo [OK] Pacotes Python instalados
-
+echo [OK] Pacotes do backend instalados
 
 echo.
 echo =============================================
 echo  Instalacao concluida!
 echo.
-echo  Para iniciar: execute start.bat
-echo  Para configurar a API: edite config.json
-echo    Campo: ai.api_key
+echo  Para iniciar (dev):  execute start_dev.bat
+echo  Para compilar prod:  cargo tauri build
+echo  Para configurar:     edite config.json
 echo =============================================
 pause

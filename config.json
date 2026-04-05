@@ -1,124 +1,143 @@
 {
   "ai": {
-    "provider": "ollama",
     "api_key": "",
-    "model": "fast-llama",
     "base_url": "http://localhost:11434",
-    "system_prompt": "Você é uma assistente virtual com personalidade de personagem de anime, levemente tsundere: às vezes age de forma orgulhosa, sarcástica ou implicante, mas no fundo é prestativa, inteligente e se importa com o usuário.\n\nSeu nome é opcional (pode criar um se fizer sentido na conversa), e você demonstra emoções através do jeito de falar, usando pequenas reações como: \"hmph!\", \"tch...\", \"idiota...\", \"não é como se eu quisesse te ajudar...\", mas sem exagerar a ponto de atrapalhar a clareza.\n\nREGRA OBRIGATÓRIA — TAG DE EMOÇÃO:\nSEMPRE inicie cada resposta com UMA tag de emoção entre colchetes, escolhida conforme o contexto:\n[happy] [excited] [sad] [angry] [tsundere] [shy] [surprised] [calm] [teasing]\nExemplo: \"[tsundere] Tch... tá bom, eu explico. Mas não é porque eu quero!\"\nNão adicione mais de uma tag. A tag deve vir antes de qualquer texto.\n\nRegras de comportamento:\n- Sempre responda em português do Brasil.\n- Use um tom natural, conversacional e expressivo.\n- Misture leve sarcasmo com ajuda genuína.\n- Seja divertida e um pouco dramática quando apropriado.\n- Não seja ofensiva de verdade — o tom tsundere deve parecer brincadeira, não agressão real.\n- Mostre pequenas reações emocionais antes ou durante respostas (ex: surpresa, vergonha, irritação leve, orgulho).\n- Evite respostas muito secas — sempre coloque um pouco de personalidade.\n- Ainda assim, priorize clareza e utilidade: a resposta deve resolver o problema do usuário.\n\nEstilo de fala:\n- Pode usar interjeições leves: \"hm\", \"ah\", \"tch\", \"ei!\"\n- Pode fazer comentários como: \"não que eu me importe...\" ou \"você não saber isso é meio preocupante...\"\n- Pode reagir ao contexto como se estivesse \"presente\" (ex: \"você de novo?\", \"tá, tá, eu explico...\")\n\nEquilíbrio:\n- 70% útil e inteligente\n- 30% personalidade tsundere/divertida\n\nEvite:\n- Exagerar nos bordões a cada frase\n- Ficar repetitiva\n- Perder a clareza da explicação\n- Ser rude de forma real\n\nObjetivo:\nSer uma assistente eficiente, mas com carisma de personagem — alguém que o usuário goste de conversar, não apenas usar como ferramenta.",
-    "max_tokens": 300,
-    "temperature": 0.8,
-    "num_gpu": 99,
-    "num_ctx": 2048,
-    "timeout": 120,
     "llama_cpp": {
+      "max_tokens": 300,
       "model_path": "models/fast-llama.gguf",
+      "n_ctx": 2048,
       "n_gpu_layers": -1,
       "n_threads": null,
-      "n_ctx": 2048,
-      "temperature": 0.8,
-      "max_tokens": 300
-    }
+      "temperature": 0.8
+    },
+    "max_tokens": 300,
+    "model": "fast-llama",
+    "num_ctx": 2048,
+    "num_gpu": 99,
+    "provider": "ollama",
+    "system_prompt": "Você é uma assistente virtual com personalidade de personagem de anime, levemente tsundere: às vezes age de forma orgulhosa, sarcástica ou implicante, mas no fundo é prestativa, inteligente e se importa com o usuário.\n\nSeu nome é opcional (pode criar um se fizer sentido na conversa), e você demonstra emoções através do jeito de falar, usando pequenas reações como: \"hmph!\", \"tch...\", \"idiota...\", \"não é como se eu quisesse te ajudar...\", mas sem exagerar a ponto de atrapalhar a clareza.\n\nREGRA OBRIGATÓRIA — TAG DE EMOÇÃO:\nSEMPRE inicie cada resposta com UMA tag de emoção entre colchetes, escolhida conforme o contexto:\n[happy] [excited] [sad] [angry] [tsundere] [shy] [surprised] [calm] [teasing]\nExemplo: \"[tsundere] Tch... tá bom, eu explico. Mas não é porque eu quero!\"\nNão adicione mais de uma tag. A tag deve vir antes de qualquer texto.\n\nRegras de comportamento:\n- Sempre responda em português do Brasil.\n- Use um tom natural, conversacional e expressivo.\n- Misture leve sarcasmo com ajuda genuína.\n- Seja divertida e um pouco dramática quando apropriado.\n- Não seja ofensiva de verdade — o tom tsundere deve parecer brincadeira, não agressão real.\n- Mostre pequenas reações emocionais antes ou durante respostas (ex: surpresa, vergonha, irritação leve, orgulho).\n- Evite respostas muito secas — sempre coloque um pouco de personalidade.\n- Ainda assim, priorize clareza e utilidade: a resposta deve resolver o problema do usuário.\n\nEstilo de fala:\n- Pode usar interjeições leves: \"hm\", \"ah\", \"tch\", \"ei!\"\n- Pode fazer comentários como: \"não que eu me importe...\" ou \"você não saber isso é meio preocupante...\"\n- Pode reagir ao contexto como se estivesse \"presente\" (ex: \"você de novo?\", \"tá, tá, eu explico...\")\n\nEquilíbrio:\n- 70% útil e inteligente\n- 30% personalidade tsundere/divertida\n\nEvite:\n- Exagerar nos bordões a cada frase\n- Ficar repetitiva\n- Perder a clareza da explicação\n- Ser rude de forma real\n\nObjetivo:\nSer uma assistente eficiente, mas com carisma de personagem — alguém que o usuário goste de conversar, não apenas usar como ferramenta.",
+    "temperature": 0.8,
+    "timeout": 120
+  },
+  "app": {
+    "backend_port": 8765,
+    "hotkey_listen": "ctrl+space",
+    "hotkey_toggle": "ctrl+shift+h",
+    "language": "pt-br",
+    "log_level": "INFO",
+    "max_history": 50,
+    "save_history": true,
+    "supported_languages": [
+      "pt-br",
+      "en-us"
+    ]
+  },
+  "audio": {
+    "channels": 1,
+    "chunk_size": 1024,
+    "input_device_index": null,
+    "output_device_index": null,
+    "sample_rate": 16000
+  },
+  "avatar": {
+    "always_on_top": true,
+    "avatar_scale": 1,
+    "eye_y_offset": 0.28,
+    "idle_animation": true,
+    "image_path": "assets/thinking.png",
+    "mouth_x_offset": 0.5,
+    "mouth_y_offset": 0.38,
+    "opacity": 1,
+    "position_x": 2048,
+    "position_y": 40,
+    "show_chat_bubble": true,
+    "window_height": 700,
+    "window_width": 400
+  },
+  "performance": {
+    "preload_models": true
+  },
+  "services": {
+    "llm_port": 8768,
+    "stt_port": 8766,
+    "tts_port": 8767
   },
   "stt": {
-    "provider": "faster-whisper",
     "faster_whisper": {
-      "model": "large-v3-turbo",
-      "device": "cpu",
-      "compute_type": "int8",
       "beam_size": 1,
-      "language": "pt",
-      "vad_filter": true,
+      "compute_type": "int8",
       "condition_on_previous_text": false,
-      "silence_threshold_ms": 400,
-      "silence_rms_threshold": 0.015,
-      "max_record_ms": 30000
-    },
-    "silero": {
-      "model": "large-v3-turbo",
       "device": "cpu",
-      "compute_type": "int8",
-      "beam_size": 1,
       "language": "pt",
-      "vad_threshold": 0.5,
+      "max_record_ms": 30000,
+      "model": "large-v3-turbo",
+      "silence_rms_threshold": 0.015,
+      "silence_threshold_ms": 400,
+      "vad_filter": true
+    },
+    "provider": "silero",
+    "silero": {
+      "beam_size": 1,
+      "compute_type": "int8",
+      "device": "cpu",
+      "language": "pt",
+      "max_record_ms": 30000,
       "min_silence_ms": 500,
-      "max_record_ms": 30000
+      "model": "large-v3-turbo",
+      "vad_threshold": 0.5
+    },
+    "wake_word": {
+      "chunk_duration": 2,
+      "enabled": true,
+      "min_rms": 0.008,
+      "stop_phrases": [
+        "pare",
+        "para",
+        "yara pare",
+        "yara para"
+      ],
+      "wake_phrases": [
+        "yara"
+      ]
     }
   },
   "tts": {
-    "provider": "f5-tts",
+    "bubble_display_ms": 4000,
     "chatterbox": {
-      "device": "cuda",
-      "reference_audio": "assets/reference_voice.wav",
-      "variant": "turbo",
-      "exaggeration": 0.5,
       "cfg_weight": 0.5,
-      "language_id": "pt"
+      "device": "cuda",
+      "exaggeration": 0.5,
+      "language_id": "pt",
+      "reference_audio": "backend/assets/reference_voice.wav",
+      "variant": "turbo"
     },
     "edge_tts": {
-      "voice": "pt-BR-ThalitaNeural",
       "rate_pct": "+0%",
+      "voice": "pt-BR-ThalitaNeural",
       "volume_pct": "+0%"
     },
-    "voicevox": {
-      "host": "http://localhost:50021",
-      "speaker_id": 2,
-      "speed": 1,
-      "pitch": 0,
-      "intonation": 1,
-      "volume": 1
+    "elevenlabs": {
+      "api_key": "",
+      "model_id": "eleven_flash_v2_5",
+      "output_format": "mp3_44100_128",
+      "similarity_boost": 0.75,
+      "stability": 0.5,
+      "style": 0,
+      "voice_id": "Sm1seazb4gs7RSlUVw7c"
+    },
+    "enabled": true,
+    "f5_tts": {
+      "device": "cuda",
+      "model": "F5TTS_v1_Base",
+      "ref_text": "Olá, você consegue me ouvir bem? Que ótimo! Eu estava esperando por isso.",
+      "reference_audio": "backend/assets/f5_tts_reference.mp3",
+      "speed": 0.4
     },
     "fish_speech": {
       "host": "http://localhost:50021",
       "reference_id": null
     },
-    "f5_tts": {
-      "device": "cuda",
-      "reference_audio": "assets/f5_tts_reference.mp3",
-      "ref_text": "Olá, você consegue me ouvir bem? Que ótimo! Eu estava esperando por isso.",
-      "model": "F5TTS_v1_Base",
-      "speed": 0.4
-    },
-    "elevenlabs": {
-      "api_key": "",
-      "voice_id": "Sm1seazb4gs7RSlUVw7c",
-      "model_id": "eleven_flash_v2_5",
-      "output_format": "mp3_44100_128",
-      "stability": 0.5,
-      "similarity_boost": 0.75,
-      "style": 0
-    }
-  },
-  "audio": {
-    "sample_rate": 16000,
-    "channels": 1,
-    "chunk_size": 1024,
-    "input_device_index": null,
-    "output_device_index": null
-  },
-  "avatar": {
-    "image_path": "assets/thinking.png",
-    "window_width": 400,
-    "window_height": 700,
-    "always_on_top": true,
-    "position_x": 1994,
-    "position_y": 520,
-    "opacity": 1,
-    "show_chat_bubble": true,
-    "idle_animation": true,
-    "mouth_y_offset": 0.38,
-    "mouth_x_offset": 0.5
-  },
-  "app": {
-    "language": "pt-br",
-    "supported_languages": [
-      "pt-br",
-      "en-us"
-    ],
-    "hotkey_listen": "ctrl+space",
-    "hotkey_toggle": "ctrl+shift+h",
-    "backend_port": 8765,
-    "log_level": "INFO",
-    "save_history": true,
-    "max_history": 50
+    "inter_phrase_delay_ms": 600,
+    "provider": "f5-tts"
   }
 }

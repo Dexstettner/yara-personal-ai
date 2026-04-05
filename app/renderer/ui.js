@@ -6,11 +6,12 @@ const WS_URL  = 'ws://localhost:8765/ws';
 const RECONNECT_DELAY = 3000;
 
 let ws = null;
-let isListening   = false;
-let isSpeaking    = false;
-let config        = {};
-let chatHideTimer = null;
-let twTimer       = null;
+let isListening      = false;
+let isSpeaking       = false;
+let config           = {};
+let chatHideTimer    = null;
+let resetBubbleTimer = null;   // tracked so openYaraBubble() can cancel it
+let twTimer          = null;
 
 // ─── Elementos ──────────────────────────────────────────────────────────────
 const btnListen        = document.getElementById('btn-listen');
@@ -26,8 +27,8 @@ const btnMinimize      = document.getElementById('btn-minimize');
 
 // ─── Inicialização ──────────────────────────────────────────────────────────
 async function init() {
-  if (window.electronAPI) {
-    config = await window.electronAPI.getConfig();
+  if (window.__TAURI__) {
+    config = await window.__TAURI__.core.invoke('get_config');
     window._avatarConfig = config.avatar;
   }
   connectWS();
@@ -148,9 +149,9 @@ function handleMessage(msg) {
 function setupControls() {
   btnListen.addEventListener('click', toggleListen);
   btnStop.addEventListener('click', () => sendWS('stop_speaking'));
-  btnMinimize.addEventListener('click', () => window.electronAPI?.minimizeToTray());
+  btnMinimize.addEventListener('click', () => window.__TAURI__?.core.invoke('minimize_to_tray'));
   document.getElementById('btn-reset-pos')?.addEventListener('click', () => {
-    window.electronAPI?.resetPosition();
+    window.__TAURI__?.core.invoke('reset_position');
   });
   setupDebugPanel();
   setupResize();
@@ -190,12 +191,9 @@ function setupDebugPanel() {
 }
 
 function setupHotkeys() {
-  if (window.electronAPI) {
-    window.electronAPI.onHotkeyListen(() => toggleListen());
-    window.electronAPI.onBackendDisconnected(() => {
-      setStatus('error', 'Backend offline');
-    });
-  }
+  // Eventos emitidos pelo Rust via Tauri
+  window.__TAURI__?.event.listen('hotkey-listen', () => toggleListen());
+  window.__TAURI__?.event.listen('backend-disconnected', () => setStatus('error', 'Backend offline'));
 
   // Tecla Escape para parar
   document.addEventListener('keydown', (e) => {
@@ -224,6 +222,8 @@ function setStatus(state, text) {
 // ─── Balões de fala ───────────────────────────────────────────────────────
 function openYaraBubble() {
   if (chatHideTimer) { clearTimeout(chatHideTimer); chatHideTimer = null; }
+  // Cancel any pending resetBubbleContent so it doesn't clear new text
+  if (resetBubbleTimer) { clearTimeout(resetBubbleTimer); resetBubbleTimer = null; }
   yaraBubble.classList.add('bubble-visible');
 }
 
@@ -233,10 +233,11 @@ function openUserBubble() {
 
 function hideBubble(immediately = false) {
   if (chatHideTimer) { clearTimeout(chatHideTimer); chatHideTimer = null; }
+  if (resetBubbleTimer) { clearTimeout(resetBubbleTimer); resetBubbleTimer = null; }
   stopTypeWriter();
   yaraBubble.classList.remove('bubble-visible');
   userBubble.classList.remove('bubble-visible');
-  setTimeout(resetBubbleContent, immediately ? 0 : 380);
+  resetBubbleTimer = setTimeout(() => { resetBubbleContent(); resetBubbleTimer = null; }, immediately ? 0 : 380);
 }
 
 function scheduleBubbleHide(ms) {
@@ -316,7 +317,7 @@ function typeWriter(el, text, speed = 22) {
 // ─── Resize grip ─────────────────────────────────────────────────────────
 function setupResize() {
   const grip = document.getElementById('resize-grip');
-  if (!grip || !window.electronAPI) return;
+  if (!grip || !window.__TAURI__) return;
 
   let resizing = false;
   let startX, startY, startW, startH;
@@ -326,7 +327,7 @@ function setupResize() {
     resizing = true;
     startX = e.screenX;
     startY = e.screenY;
-    const size = await window.electronAPI.getWindowSize();
+    const size = await window.__TAURI__.core.invoke('get_window_size');
     startW = size[0];
     startH = size[1];
     e.preventDefault();
@@ -334,16 +335,16 @@ function setupResize() {
 
   document.addEventListener('mousemove', (e) => {
     if (!resizing) return;
-    window.electronAPI.resizeWindow(
-      startW + (e.screenX - startX),
-      startH + (e.screenY - startY)
-    );
+    window.__TAURI__.core.invoke('resize_window', {
+      w: Math.max(180, startW + (e.screenX - startX)),
+      h: Math.max(280, startH + (e.screenY - startY)),
+    });
   });
 
   document.addEventListener('mouseup', () => {
     if (!resizing) return;
     resizing = false;
-    window.electronAPI.saveWindowSize();
+    window.__TAURI__.core.invoke('save_window_size');
   });
 }
 
@@ -356,56 +357,36 @@ function updateAvatarFlip(windowX) {
 }
 
 async function initAvatarFlip() {
-  if (!window.electronAPI) return;
-  const pos = await window.electronAPI.getPosition();
+  if (!window.__TAURI__) return;
+  const pos = await window.__TAURI__.core.invoke('get_position');
   updateAvatarFlip(pos[0]);
+
+  // Atualiza flip em tempo real durante drag nativo via OS
+  window.__TAURI__.window.getCurrentWindow().onMoved(({ payload: position }) => {
+    updateAvatarFlip(position.x / window.devicePixelRatio);
+  });
 }
 
 // ─── Drag da janela pelo avatar ──────────────────────────────────────────
+// Usa startDragging() do Tauri — drag nativo via OS, sem flood de IPC
 (function setupDrag() {
   const frame = document.getElementById('avatar-frame');
-  let dragging = false;
-  let startScreenX, startScreenY, winStartX, winStartY;
-  let pendingX = null, pendingY = null, rafPending = false;
 
-  frame.addEventListener('mousedown', async (e) => {
+  frame.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    dragging = true;
-    startScreenX = e.screenX;
-    startScreenY = e.screenY;
-    if (window.electronAPI) {
-      const pos = await window.electronAPI.getPosition();
-      winStartX = pos[0];
-      winStartY = pos[1];
-    }
-  });
+    e.preventDefault();
+    if (!window.__TAURI__) return;
 
-  document.addEventListener('mousemove', (e) => {
-    if (!dragging || !window.electronAPI || winStartX === undefined) return;
-    pendingX = winStartX + (e.screenX - startScreenX);
-    pendingY = winStartY + (e.screenY - startScreenY);
-    if (!rafPending) {
-      rafPending = true;
-      requestAnimationFrame(() => {
-        window.electronAPI.moveWindow(pendingX, pendingY);
-        updateAvatarFlip(pendingX);
-        rafPending = false;
-      });
-    }
-  });
+    window.__TAURI__.core.invoke('start_dragging');
 
-  document.addEventListener('mouseup', (e) => {
-    if (!dragging) return;
-    dragging = false;
-    if (window.electronAPI && winStartX !== undefined) {
-      const finalX = winStartX + (e.screenX - startScreenX);
-      const finalY = winStartY + (e.screenY - startScreenY);
-      window.electronAPI.savePosition(finalX, finalY);
-      updateAvatarFlip(finalX);
-    }
-    winStartX = undefined;
+    // Salva posição final ao soltar (mouseup pode não disparar — onMoved cobre o flip)
+    document.addEventListener('mouseup', async () => {
+      const pos = await window.__TAURI__.core.invoke('get_position').catch(() => null);
+      if (pos) window.__TAURI__.core.invoke('save_position', { x: pos[0], y: pos[1] });
+    }, { once: true });
   });
 })();
 
 // ─── Boot ────────────────────────────────────────────────────────────────
+// window.__TAURI__ é injetado pelo Tauri antes de DOMContentLoaded
 document.addEventListener('DOMContentLoaded', init);

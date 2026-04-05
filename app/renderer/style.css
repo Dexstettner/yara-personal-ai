@@ -31,14 +31,12 @@ html, body {
 #drag-region {
   flex: 1;
   height: 100%;
-  -webkit-app-region: drag;
 }
 
 #window-controls {
   display: flex;
   gap: 4px;
   padding-right: 8px;
-  -webkit-app-region: no-drag;
 }
 
 #window-controls button {
@@ -498,7 +496,6 @@ html, body {
   height: 22px;
   cursor: nwse-resize;
   z-index: 200;
-  -webkit-app-region: no-drag;
 }
 
 #resize-grip::before,

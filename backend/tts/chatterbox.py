@@ -45,7 +45,7 @@ class ChatterboxTTS:
 
     Config (config.json -> tts.chatterbox):
       device         : "cuda" | "cpu"
-      reference_audio: "assets/reference_voice.wav"
+      reference_audio: "backend/assets/reference_voice.wav"
       variant        : "turbo" | "standard" | "multilingual"
       exaggeration   : 0.5
       cfg_weight     : 0.5
@@ -54,7 +54,7 @@ class ChatterboxTTS:
 
     def __init__(self, cfg: dict):
         self.device          = cfg.get("device",          "cuda")
-        self.reference_audio = cfg.get("reference_audio", "assets/reference_voice.wav")
+        self.reference_audio = cfg.get("reference_audio", "backend/assets/reference_voice.wav")
         self.variant         = cfg.get("variant",         "turbo")
         self.exaggeration    = cfg.get("exaggeration",    0.5)
         self.cfg_weight      = cfg.get("cfg_weight",      0.5)
