@@ -1,0 +1,9 @@
+# ── LLM: TurboQuant (Google, 2026) ───────────────────────────────────────────
+# Cliente OpenAI-compatível que conecta ao turboquant-server
+openai>=1.0.0
+
+# Backend AWQ para transformers 5.x — instalar via Docker/WSL2 (Linux apenas)
+# gptqmodel falha no Windows (sys.abiflags ausente); use o container Docker.
+
+# Para rodar o servidor localmente (turboquant-server ...):
+#   turboquant-server --model Qwen/Qwen2.5-7B-Instruct-AWQ --bits 4 --port 8000

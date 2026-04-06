@@ -9,16 +9,18 @@ Troque o provider em config.json -> ai.provider
 
 import logging
 
-from .anthropic import AnthropicProvider
-from .ollama import OllamaProvider
-from .llama_cpp import LlamaCppProvider
+from .anthropic   import AnthropicProvider
+from .ollama      import OllamaProvider
+from .llama_cpp   import LlamaCppProvider
+from .turboquant  import TurboQuantProvider
 
 logger = logging.getLogger(__name__)
 
 _PROVIDERS: dict[str, type] = {
-    "anthropic": AnthropicProvider,
-    "ollama":    OllamaProvider,
-    "llama-cpp": LlamaCppProvider,
+    "anthropic":  AnthropicProvider,
+    "ollama":     OllamaProvider,
+    "llama-cpp":  LlamaCppProvider,
+    "turboquant": TurboQuantProvider,
 }
 
 

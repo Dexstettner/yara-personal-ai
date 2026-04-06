@@ -21,6 +21,7 @@
 -r requirements/stt_whisper.txt
 -r requirements/llm_anthropic.txt
 -r requirements/llm_ollama.txt
+-r requirements/llm_turboquant.txt
 -r requirements/tts_edge.txt
 -r requirements/tts_f5.txt
 # tts_chatterbox requer passos manuais — veja requirements/tts_chatterbox.txt
