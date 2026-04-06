@@ -53,8 +53,8 @@
     "mouth_x_offset": 0.5,
     "mouth_y_offset": 0.38,
     "opacity": 1,
-    "position_x": 1453,
-    "position_y": 391,
+    "position_x": 972,
+    "position_y": 161,
     "show_chat_bubble": true,
     "window_height": 700,
     "window_width": 400
@@ -108,14 +108,6 @@
   },
   "tts": {
     "bubble_display_ms": 4000,
-    "chatterbox": {
-      "cfg_weight": 0.5,
-      "device": "cuda",
-      "exaggeration": 0.5,
-      "language_id": "pt",
-      "reference_audio": "backend/assets/reference_voice.wav",
-      "variant": "turbo"
-    },
     "edge_tts": {
       "rate_pct": "+0%",
       "voice": "pt-BR-ThalitaNeural",
@@ -131,18 +123,17 @@
       "voice_id": "Sm1seazb4gs7RSlUVw7c"
     },
     "enabled": true,
-    "f5_tts": {
-      "device": "cuda",
-      "model": "F5TTS_v1_Base",
-      "ref_text": "Olá, você consegue me ouvir bem? Que ótimo! Eu estava esperando por isso.",
-      "reference_audio": "backend/assets/f5_tts_reference.mp3",
-      "speed": 0.4
-    },
     "fish_speech": {
       "host": "http://localhost:50021",
       "reference_id": null
     },
     "inter_phrase_delay_ms": 600,
-    "provider": "f5-tts"
+    "kokoro": {
+      "clone_server": "http://localhost:8010",
+      "lang": "pt",
+      "speed": 1.0,
+      "voice": "pf_dora"
+    },
+    "provider": "kokoro"
   }
 }

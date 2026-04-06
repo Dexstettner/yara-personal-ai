@@ -2,31 +2,28 @@
 tts — Text-to-Speech package.
 Troque o provider em config.json -> tts.provider
 
-  chatterbox  : clonagem de voz offline (~4-7 GB VRAM)
   edge-tts    : vozes Microsoft (requer internet, sem API key)
-  fish-speech : vozes multilingual (Fish Speech server local)
-  f5-tts      : flow matching TTS, leve (~300 MB VRAM)
   elevenlabs  : vozes premium (requer internet + API key)
+  fish-speech : vozes multilingual (Fish Speech server local)
+  kokoro      : TTS local leve, roda em CPU (hexgrad/Kokoro-82M)
 """
 
 import logging
 import math
 import re
 
-from .chatterbox  import ChatterboxTTS
 from .edge_tts    import EdgeTTS
-from .fish_speech import FishSpeech
-from .f5_tts      import F5TTS
 from .elevenlabs  import ElevenLabsTTS
+from .fish_speech import FishSpeech
+from .kokoro      import KokoroTTS
 
 logger = logging.getLogger(__name__)
 
 _ENGINES: dict[str, tuple[type, str]] = {
-    "chatterbox":  (ChatterboxTTS,  "chatterbox"),
-    "edge-tts":    (EdgeTTS,        "edge_tts"),
-    "fish-speech": (FishSpeech,     "fish_speech"),
-    "f5-tts":      (F5TTS,          "f5_tts"),
-    "elevenlabs":  (ElevenLabsTTS,  "elevenlabs"),
+    "edge-tts":    (EdgeTTS,       "edge_tts"),
+    "elevenlabs":  (ElevenLabsTTS, "elevenlabs"),
+    "fish-speech": (FishSpeech,    "fish_speech"),
+    "kokoro":      (KokoroTTS,     "kokoro"),
 }
 
 
@@ -67,15 +64,10 @@ class TTSEngine:
     async def speak_segments_async(
         self, segments: list[tuple[str, str]], stop_event
     ) -> None:
-        """Engines que implementam speak_segments_async proprio (ex: F5-TTS) sintetizam
-        em batch e concatenam. Os demais reproduzem segmento a segmento."""
-        if hasattr(self._engine, "speak_segments_async"):
-            await self._engine.speak_segments_async(segments, stop_event)
-        else:
-            for emotion, text in segments:
-                if stop_event.is_set():
-                    break
-                await self._engine.speak_async(text, stop_event, emotion=emotion)
+        for emotion, text in segments:
+            if stop_event.is_set():
+                break
+            await self._engine.speak_async(text, stop_event, emotion=emotion)
 
     async def preload(self) -> None:
         """Pré-carrega o modelo em background se o engine suportar _ensure_model."""
